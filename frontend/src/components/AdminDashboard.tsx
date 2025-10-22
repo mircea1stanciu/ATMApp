@@ -68,6 +68,7 @@ export default function AdminDashboard() {
     username: '',
     email: '',
     password: '',
+    confirm_password: '',
     full_name: '',
     role: 'user',
     assigned_communities: [] as string[]
@@ -351,6 +352,12 @@ export default function AdminDashboard() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate passwords match
+    if (createUserForm.password !== createUserForm.confirm_password) {
+      alert('❌ Passwords do not match');
+      return;
+    }
+    
     // Validate community_lead has at least one community
     if (createUserForm.role === 'community_lead' && createUserForm.assigned_communities.length === 0) {
       alert('❌ Community Leads must have at least one assigned community');
@@ -369,7 +376,14 @@ export default function AdminDashboard() {
 
       const result = await apiCall(`/api/organizations/${orgId}/users`, {
         method: 'POST',
-        body: JSON.stringify(createUserForm)
+        body: JSON.stringify({
+          username: createUserForm.username,
+          email: createUserForm.email,
+          password: createUserForm.password,
+          full_name: createUserForm.full_name,
+          role: createUserForm.role,
+          assigned_communities: createUserForm.assigned_communities
+        })
       });
 
       alert(`✅ User created successfully!\n\nUsername: ${result.user.username}\nEmail: ${result.user.email}\nRole: ${result.user.role}`);
@@ -379,6 +393,7 @@ export default function AdminDashboard() {
         username: '',
         email: '',
         password: '',
+        confirm_password: '',
         full_name: '',
         role: 'user',
         assigned_communities: []
@@ -1224,10 +1239,11 @@ export default function AdminDashboard() {
                 <input
                   type="text"
                   required
+                  minLength={3}
                   value={createUserForm.username}
                   onChange={(e) => setCreateUserForm(prev => ({ ...prev, username: e.target.value }))}
                   placeholder="john_doe"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
               <div>
@@ -1240,7 +1256,7 @@ export default function AdminDashboard() {
                   value={createUserForm.email}
                   onChange={(e) => setCreateUserForm(prev => ({ ...prev, email: e.target.value }))}
                   placeholder="john@example.com"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
               <div>
@@ -1253,7 +1269,7 @@ export default function AdminDashboard() {
                   value={createUserForm.full_name}
                   onChange={(e) => setCreateUserForm(prev => ({ ...prev, full_name: e.target.value }))}
                   placeholder="John Doe"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
               <div>
@@ -1263,15 +1279,26 @@ export default function AdminDashboard() {
                 <input
                   type="password"
                   required
+                  minLength={8}
                   value={createUserForm.password}
                   onChange={(e) => setCreateUserForm(prev => ({ ...prev, password: e.target.value }))}
-                  placeholder="••••••••"
-                  minLength={6}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="At least 8 characters"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Minimum 6 characters
-                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Confirm Password *
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={createUserForm.confirm_password}
+                  onChange={(e) => setCreateUserForm(prev => ({ ...prev, confirm_password: e.target.value }))}
+                  placeholder="Re-enter your password"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
               </div>
               {currentUser?.role === 'super_admin' && (
                 <div>
@@ -1361,6 +1388,7 @@ export default function AdminDashboard() {
                       username: '',
                       email: '',
                       password: '',
+                      confirm_password: '',
                       full_name: '',
                       role: 'user',
                       assigned_communities: []
@@ -1372,7 +1400,7 @@ export default function AdminDashboard() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                 >
                   Create User
                 </button>
