@@ -335,14 +335,7 @@ async def register_org_admin(register_data: dict, db: Session = Depends(get_db))
     if not org.is_active:
         raise HTTPException(status_code=403, detail="Organization is not active")
     
-    # Check if organization already has an admin
-    existing_admin = db.query(User).filter(
-        User.organization_id == org.id,
-        User.role == UserRole.ORG_ADMIN
-    ).first()
-    
-    if existing_admin:
-        raise HTTPException(status_code=403, detail="Organization already has an administrator")
+    # Note: Multiple organization admins are allowed per organization
     
     # Check if email already exists
     if db.query(User).filter(User.email == register_data["email"]).first():
