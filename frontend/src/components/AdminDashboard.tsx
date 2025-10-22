@@ -91,6 +91,12 @@ export default function AdminDashboard() {
         return;
       }
 
+      // Set initial section based on role
+      if (user.role === 'org_admin') {
+        // Org admins start with users section (their organization users)
+        setActiveSection('users');
+      }
+
       setLoading(false);
     } catch (error) {
       console.error('Authentication failed:', error);
@@ -129,25 +135,42 @@ export default function AdminDashboard() {
 
   const loadOverview = async () => {
     try {
-      // Load organizations to calculate stats
-      const orgs = await apiCall('/api/organizations');
-      setOrganizations(orgs);
-      
-      // Calculate stats from organization data
-      let totalUsers = 0;
-      let totalChats = 0;
-      
-      orgs.forEach((org: Organization) => {
-        totalUsers += org.user_count || 0;
-        totalChats += org.chat_count || 0;
-      });
-      
-      setStats({
-        total_organizations: orgs.length,
-        total_users: totalUsers,
-        active_users: totalUsers, // Assuming all users are active for now
-        total_chat_sessions: totalChats
-      });
+      if (currentUser?.role === 'org_admin') {
+        // Org admins see stats for their organization only
+        if (currentUser.organization?.id) {
+          const orgStats = await apiCall(`/api/organizations/${currentUser.organization.id}/stats`);
+          const myOrg = await apiCall('/api/organizations/my-organization');
+          
+          setStats({
+            total_organizations: 1,
+            total_users: orgStats.total_users || 0,
+            active_users: orgStats.active_users || 0,
+            total_chat_sessions: orgStats.total_chats || 0
+          });
+          
+          setOrganizations([myOrg]);
+        }
+      } else {
+        // Super admins see platform-wide stats
+        const orgs = await apiCall('/api/organizations');
+        setOrganizations(orgs);
+        
+        // Calculate stats from organization data
+        let totalUsers = 0;
+        let totalChats = 0;
+        
+        orgs.forEach((org: Organization) => {
+          totalUsers += org.user_count || 0;
+          totalChats += org.chat_count || 0;
+        });
+        
+        setStats({
+          total_organizations: orgs.length,
+          total_users: totalUsers,
+          active_users: totalUsers, // Assuming all users are active for now
+          total_chat_sessions: totalChats
+        });
+      }
     } catch (error) {
       console.error('Failed to load overview:', error);
     }
@@ -164,26 +187,38 @@ export default function AdminDashboard() {
 
   const loadUsers = async () => {
     try {
-      // Load all organizations first to get users from each
-      const orgs = await apiCall('/api/organizations');
-      let allUsers: User[] = [];
-      
-      // Fetch users for each organization
-      for (const org of orgs) {
-        try {
-          const orgUsers = await apiCall(`/api/organizations/${org.id}/users`);
-          // Add organization info to each user
+      if (currentUser?.role === 'org_admin') {
+        // Org admins can only see users from their organization
+        if (currentUser.organization?.id) {
+          const orgUsers = await apiCall(`/api/organizations/${currentUser.organization.id}/users`);
           const usersWithOrg = orgUsers.map((user: User) => ({
             ...user,
-            organization: { name: org.name }
+            organization: { name: currentUser.organization?.name || '' }
           }));
-          allUsers = [...allUsers, ...usersWithOrg];
-        } catch (err) {
-          console.error(`Failed to load users for ${org.name}:`, err);
+          setUsers(usersWithOrg);
         }
+      } else {
+        // Super admins can see users from all organizations
+        const orgs = await apiCall('/api/organizations');
+        let allUsers: User[] = [];
+        
+        // Fetch users for each organization
+        for (const org of orgs) {
+          try {
+            const orgUsers = await apiCall(`/api/organizations/${org.id}/users`);
+            // Add organization info to each user
+            const usersWithOrg = orgUsers.map((user: User) => ({
+              ...user,
+              organization: { name: org.name }
+            }));
+            allUsers = [...allUsers, ...usersWithOrg];
+          } catch (err) {
+            console.error(`Failed to load users for ${org.name}:`, err);
+          }
+        }
+        
+        setUsers(allUsers);
       }
-      
-      setUsers(allUsers);
     } catch (error) {
       console.error('Failed to load users:', error);
     }
@@ -274,10 +309,10 @@ export default function AdminDashboard() {
 
         <nav className="flex-1 py-4">
           {[
-            { id: 'overview', icon: '📊', label: 'Overview' },
-            { id: 'organizations', icon: '🏢', label: 'Organizations' },
-            { id: 'users', icon: '👥', label: 'Users' }
-          ].map((item) => (
+            { id: 'overview', icon: '📊', label: 'Overview', roles: ['super_admin', 'org_admin'] },
+            { id: 'organizations', icon: '🏢', label: 'Organizations', roles: ['super_admin'] },
+            { id: 'users', icon: '👥', label: 'Users', roles: ['super_admin', 'org_admin'] }
+          ].filter(item => item.roles.includes(currentUser?.role || '')).map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveSection(item.id)}
@@ -320,10 +355,10 @@ export default function AdminDashboard() {
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {activeSection === 'overview' && 'Dashboard Overview'}
                 {activeSection === 'organizations' && 'Organizations Management'}
-                {activeSection === 'users' && 'Users Management'}
+                {activeSection === 'users' && (currentUser?.role === 'org_admin' ? 'Organization Users' : 'Users Management')}
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Manage your multi-tenant platform
+                {currentUser?.role === 'org_admin' ? 'Manage your organization' : 'Manage your multi-tenant platform'}
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -348,17 +383,29 @@ export default function AdminDashboard() {
             <div className="space-y-6">
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {stats.total_organizations}
+                {currentUser?.role === 'super_admin' && (
+                  <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {stats.total_organizations}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Total Organizations</div>
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Total Organizations</div>
-                </div>
+                )}
+                {currentUser?.role === 'org_admin' && (
+                  <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {currentUser.organization?.name || 'My Organization'}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Organization</div>
+                  </div>
+                )}
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
                   <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                     {stats.total_users}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Total Users</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {currentUser?.role === 'org_admin' ? 'Organization Users' : 'Total Users'}
+                  </div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
                   <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
@@ -370,14 +417,18 @@ export default function AdminDashboard() {
                   <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                     {stats.total_chat_sessions}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Total Chats</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {currentUser?.role === 'org_admin' ? 'Organization Chats' : 'Total Chats'}
+                  </div>
                 </div>
               </div>
 
               {/* Recent Activity */}
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Organizations</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {currentUser?.role === 'org_admin' ? 'My Organization' : 'Recent Organizations'}
+                  </h3>
                 </div>
                 <div className="p-6">
                   {organizations.length === 0 ? (
