@@ -107,39 +107,64 @@ export default function Header({ currentCommunity, onClear, onShowExamples, onLo
             </Link>
           </div>
 
-          {/* Navigation Links (Hidden on mobile, shown only on home page) */}
-          {!currentCommunity && pathname === '/' && (
+          {/* Navigation Links (Hidden on mobile) */}
+          {!currentCommunity && (pathname === '/' || pathname === '/dashboard') && (
             <div className="hidden md:flex items-center space-x-2">
-              <button
-                onClick={() => onSectionChange?.('hero')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  activeSection === 'hero' || !activeSection
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                Home
-              </button>
-              <button
-                onClick={() => onSectionChange?.('communities')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  activeSection === 'communities'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                Explore Communities
-              </button>
-              <button
-                onClick={() => onSectionChange?.('about')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  activeSection === 'about'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                Learn More
-              </button>
+              {pathname === '/' ? (
+                <>
+                  <button
+                    onClick={() => onSectionChange?.('hero')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      activeSection === 'hero' || !activeSection
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    Home
+                  </button>
+                  <button
+                    onClick={() => onSectionChange?.('communities')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      activeSection === 'communities'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    Explore Communities
+                  </button>
+                  <button
+                    onClick={() => onSectionChange?.('about')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      activeSection === 'about'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    Learn More
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/"
+                    className="px-4 py-2 rounded-lg font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+                  >
+                    Home
+                  </Link>
+                  <button
+                    className="px-4 py-2 rounded-lg font-medium bg-blue-600 text-white shadow-md transition-all duration-200"
+                    disabled
+                  >
+                    Dashboard
+                  </button>
+                  <Link
+                    href="/#about"
+                    className="px-4 py-2 rounded-lg font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+                  >
+                    Learn More
+                  </Link>
+                </>
+              )}
             </div>
           )}
 
