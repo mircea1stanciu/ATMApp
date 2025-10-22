@@ -81,6 +81,7 @@ export default function AdminDashboard() {
     description: '',
     subscription_plan: 'free'
   });
+  const [selectedOrgFilter, setSelectedOrgFilter] = useState<string>('all');
   const router = useRouter();
 
   useEffect(() => {
@@ -593,6 +594,39 @@ export default function AdminDashboard() {
     router.push('/login');
   };
 
+  // Helper function to get role priority (lower number = higher priority)
+  const getRolePriority = (role: string): number => {
+    const priorities: { [key: string]: number } = {
+      'super_admin': 1,
+      'org_admin': 2,
+      'community_lead': 3,
+      'user': 4
+    };
+    return priorities[role] || 999;
+  };
+
+  // Filter and sort users for display
+  const getFilteredAndSortedUsers = () => {
+    let filtered = users;
+
+    // Apply organization filter (only for super admin)
+    if (currentUser?.role === 'super_admin' && selectedOrgFilter !== 'all') {
+      filtered = users.filter(user => user.organization?.id === parseInt(selectedOrgFilter));
+    }
+
+    // Sort by: 1) Role priority (descending), 2) Username (alphabetically)
+    const sorted = [...filtered].sort((a, b) => {
+      // First sort by role priority
+      const roleDiff = getRolePriority(a.role) - getRolePriority(b.role);
+      if (roleDiff !== 0) return roleDiff;
+
+      // If same role, sort alphabetically by username
+      return a.username.localeCompare(b.username);
+    });
+
+    return sorted;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -932,19 +966,51 @@ export default function AdminDashboard() {
           {activeSection === 'users' && (
             <div className="space-y-6">
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Users Management</h3>
-                  <button
-                    onClick={() => setShowCreateUserModal(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                  >
-                    ➕ Create User
-                  </button>
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Users Management</h3>
+                    <button
+                      onClick={() => setShowCreateUserModal(true)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    >
+                      ➕ Create User
+                    </button>
+                  </div>
+                  
+                  {/* Filters - Only for Super Admin */}
+                  {currentUser?.role === 'super_admin' && (
+                    <div className="flex gap-4 items-center">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Filter by Organization:
+                        </label>
+                        <select
+                          value={selectedOrgFilter}
+                          onChange={(e) => setSelectedOrgFilter(e.target.value)}
+                          className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                        >
+                          <option value="all">All Organizations</option>
+                          {organizations.map((org) => (
+                            <option key={org.id} value={org.id}>
+                              {org.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        Showing {getFilteredAndSortedUsers().length} of {users.length} users
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="p-6">
                   {users.length === 0 ? (
                     <p className="text-center text-gray-500 dark:text-gray-400 py-8">
                       No users found
+                    </p>
+                  ) : getFilteredAndSortedUsers().length === 0 ? (
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+                      No users found matching the selected filter
                     </p>
                   ) : (
                     <div className="overflow-x-auto">
@@ -954,7 +1020,10 @@ export default function AdminDashboard() {
                             <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Username</th>
                             <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Email</th>
                             <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Organization</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Role</th>
+                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+                              Role
+                              <span className="ml-1 text-xs text-gray-400">(sorted)</span>
+                            </th>
                             <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Communities</th>
                             <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Status</th>
                             <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Last Login</th>
@@ -962,7 +1031,7 @@ export default function AdminDashboard() {
                           </tr>
                         </thead>
                         <tbody>
-                          {users.map((user) => (
+                          {getFilteredAndSortedUsers().map((user) => (
                             <tr key={user.id} className="border-b border-gray-100 dark:border-gray-700">
                               <td className="py-3">
                                 <div>
