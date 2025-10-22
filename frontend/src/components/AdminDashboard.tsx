@@ -1571,10 +1571,10 @@ export default function AdminDashboard() {
                   </select>
                 </div>
               )}
-              {(currentUser?.role === 'org_admin' || currentUser?.role === 'super_admin') && createUserForm.role === 'community_lead' && (
+              {(currentUser?.role === 'org_admin' || currentUser?.role === 'super_admin') && (createUserForm.role === 'community_lead' || createUserForm.role === 'user') && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Assigned Communities *
+                    Assigned Communities {createUserForm.role === 'community_lead' ? '*' : '(Optional)'}
                   </label>
                   <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3 bg-gray-50 dark:bg-gray-900">
                     {[
@@ -1608,7 +1608,9 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Select at least one community for this Community Lead
+                    {createUserForm.role === 'community_lead' 
+                      ? 'Select at least one community for this Community Lead' 
+                      : 'Select communities this user belongs to (optional)'}
                   </p>
                 </div>
               )}
@@ -1728,10 +1730,10 @@ export default function AdminDashboard() {
                   </select>
                 </div>
               )}
-              {(currentUser?.role === 'org_admin' || currentUser?.role === 'super_admin') && editUserForm.role === 'community_lead' && (
+              {(currentUser?.role === 'org_admin' || currentUser?.role === 'super_admin') && (editUserForm.role === 'community_lead' || editUserForm.role === 'user') && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Assigned Communities *
+                    Assigned Communities {editUserForm.role === 'community_lead' ? '*' : '(Optional)'}
                   </label>
                   <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3 bg-gray-50 dark:bg-gray-900">
                     {[
@@ -1765,7 +1767,9 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Select at least one community for this Community Lead
+                    {editUserForm.role === 'community_lead' 
+                      ? 'Select at least one community for this Community Lead' 
+                      : 'Select communities this user belongs to (optional)'}
                   </p>
                 </div>
               )}
