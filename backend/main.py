@@ -21,6 +21,7 @@ from core.auth import (
     authenticate_user,
     get_organization_from_subdomain,
     get_org_admin_user,
+    get_community_lead_user,
     get_super_admin_user
 )
 from agents.qa_agent import QAAgent
@@ -999,6 +1000,7 @@ async def list_organization_users(
         "email": user.email,
         "full_name": user.full_name,
         "role": user.role.value,
+        "assigned_communities": user.assigned_communities,
         "is_active": user.is_active,
         "created_at": user.created_at.isoformat(),
         "last_login": user.last_login.isoformat() if user.last_login else None
@@ -1051,13 +1053,25 @@ async def create_organization_user(
     ).first():
         raise HTTPException(status_code=400, detail="Username already taken in this organization")
     
-    # Determine user role (org_admins can only create regular users, not other admins)
+    # Determine user role
     user_role = UserRole.USER
-    if current_user.role == UserRole.SUPER_ADMIN and user_data.get("role"):
-        # Super admins can specify role
-        role_value = user_data["role"].upper()
-        if role_value in ["ORG_ADMIN", "USER"]:
-            user_role = UserRole[role_value]
+    assigned_communities = None
+    
+    if current_user.role == UserRole.SUPER_ADMIN or current_user.role == UserRole.ORG_ADMIN:
+        # Super admins and org admins can specify role
+        if user_data.get("role"):
+            role_value = user_data["role"].upper()
+            if role_value in ["ORG_ADMIN", "COMMUNITY_LEAD", "USER"]:
+                user_role = UserRole[role_value]
+                
+                # If creating community lead, handle community assignments
+                if user_role == UserRole.COMMUNITY_LEAD and user_data.get("assigned_communities"):
+                    import json
+                    assigned_communities = json.dumps(user_data["assigned_communities"])
+        
+        # Only super admins can create org admins
+        if user_role == UserRole.ORG_ADMIN and current_user.role != UserRole.SUPER_ADMIN:
+            raise HTTPException(status_code=403, detail="Only super admins can create org admins")
     
     # Create new user
     new_user = User(
@@ -1066,6 +1080,7 @@ async def create_organization_user(
         hashed_password=User.hash_password(user_data["password"]),
         full_name=user_data["full_name"],
         role=user_role,
+        assigned_communities=assigned_communities,
         organization_id=org_id,
         is_active=True
     )
@@ -1082,8 +1097,73 @@ async def create_organization_user(
             "email": new_user.email,
             "full_name": new_user.full_name,
             "role": new_user.role.value,
+            "assigned_communities": new_user.assigned_communities,
             "organization_id": new_user.organization_id,
             "is_active": new_user.is_active
+        }
+    }
+
+
+@app.patch("/api/organizations/{org_id}/users/{user_id}", tags=["Organizations"])
+async def update_organization_user(
+    org_id: int,
+    user_id: int,
+    user_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_org_admin_user)
+):
+    """Update a user's role and assigned communities (Org Admin or Super Admin)"""
+    # Verify user has permission
+    if current_user.role != UserRole.SUPER_ADMIN:
+        if current_user.organization_id != org_id:
+            raise HTTPException(status_code=403, detail="Not authorized to update users in this organization")
+    
+    # Get user
+    user = db.query(User).filter(User.id == user_id, User.organization_id == org_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update role if provided
+    if user_data.get("role"):
+        role_value = user_data["role"].upper()
+        if role_value in ["ORG_ADMIN", "COMMUNITY_LEAD", "USER"]:
+            new_role = UserRole[role_value]
+            
+            # Only super admins can create/update org admins
+            if new_role == UserRole.ORG_ADMIN and current_user.role != UserRole.SUPER_ADMIN:
+                raise HTTPException(status_code=403, detail="Only super admins can create org admins")
+            
+            user.role = new_role
+    
+    # Update assigned communities for community leads
+    if user_data.get("assigned_communities") is not None:
+        if user.role == UserRole.COMMUNITY_LEAD:
+            import json
+            user.assigned_communities = json.dumps(user_data["assigned_communities"])
+        else:
+            user.assigned_communities = None
+    
+    # Update other fields if provided
+    if user_data.get("full_name"):
+        user.full_name = user_data["full_name"]
+    
+    if user_data.get("is_active") is not None:
+        user.is_active = user_data["is_active"]
+    
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "message": "User updated successfully",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role.value,
+            "assigned_communities": user.assigned_communities,
+            "organization_id": user.organization_id,
+            "is_active": user.is_active
         }
     }
 

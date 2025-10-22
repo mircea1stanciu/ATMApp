@@ -130,6 +130,18 @@ def get_org_admin_user(current_user = Depends(get_current_user)):
     return current_user
 
 
+def get_community_lead_user(current_user = Depends(get_current_user)):
+    """Require COMMUNITY_LEAD, ORG_ADMIN, or SUPER_ADMIN role"""
+    from .database import UserRole
+    
+    if current_user.role not in [UserRole.COMMUNITY_LEAD, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Community lead access required"
+        )
+    return current_user
+
+
 def get_super_admin_user(current_user = Depends(get_current_user)):
     """Require SUPER_ADMIN role"""
     from .database import UserRole

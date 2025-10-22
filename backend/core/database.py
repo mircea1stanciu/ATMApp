@@ -35,9 +35,10 @@ def simple_verify_password(password: str, hashed: str) -> bool:
 
 class UserRole(enum.Enum):
     """User role enumeration"""
-    SUPER_ADMIN = "super_admin"  # Platform administrator
-    ORG_ADMIN = "org_admin"      # Organization administrator
-    USER = "user"                # Regular user
+    SUPER_ADMIN = "super_admin"      # Platform administrator
+    ORG_ADMIN = "org_admin"          # Organization administrator
+    COMMUNITY_LEAD = "community_lead"  # Community leader/moderator
+    USER = "user"                    # Regular user
 
 
 class SubscriptionPlan(enum.Enum):
@@ -116,6 +117,9 @@ class User(Base):
     
     # Multi-tenancy
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    
+    # Community Lead assignment (which communities they manage)
+    assigned_communities = Column(String, nullable=True)  # JSON string: ["qa", "backend"]
     
     # User preferences
     preferred_communities = Column(String, nullable=True)  # JSON string of community preferences
