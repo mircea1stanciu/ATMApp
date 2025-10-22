@@ -21,9 +21,13 @@ interface User {
   email: string;
   full_name: string;
   role: string;
+  assigned_communities?: string; // JSON string for community leads
   is_active: boolean;
   last_login?: string;
-  organization?: { name: string };
+  organization?: { 
+    id: number;
+    name: string;
+  };
 }
 
 interface Stats {
@@ -52,12 +56,21 @@ export default function AdminDashboard() {
   const [showChangePlanModal, setShowChangePlanModal] = useState(false);
   const [newPlan, setNewPlan] = useState('');
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editUserForm, setEditUserForm] = useState({
+    role: '',
+    assigned_communities: [] as string[],
+    full_name: '',
+    is_active: true
+  });
   const [createUserForm, setCreateUserForm] = useState({
     username: '',
     email: '',
     password: '',
     full_name: '',
-    role: 'user'
+    role: 'user',
+    assigned_communities: [] as string[]
   });
   const [createOrgForm, setCreateOrgForm] = useState({
     name: '',
@@ -319,6 +332,13 @@ export default function AdminDashboard() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate community_lead has at least one community
+    if (createUserForm.role === 'community_lead' && createUserForm.assigned_communities.length === 0) {
+      alert('❌ Community Leads must have at least one assigned community');
+      return;
+    }
+    
     try {
       const orgId = currentUser?.role === 'org_admin' 
         ? currentUser.organization?.id 
@@ -342,13 +362,55 @@ export default function AdminDashboard() {
         email: '',
         password: '',
         full_name: '',
-        role: 'user'
+        role: 'user',
+        assigned_communities: []
       });
       
       // Reload users
       await loadUsers();
     } catch (error) {
       alert('Failed to create user: ' + (error as Error).message);
+    }
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedUser) return;
+    
+    // Validate community_lead has at least one community
+    if (editUserForm.role === 'community_lead' && editUserForm.assigned_communities.length === 0) {
+      alert('❌ Community Leads must have at least one assigned community');
+      return;
+    }
+    
+    try {
+      const orgId = selectedUser.organization?.id;
+      if (!orgId) {
+        alert('User organization not found');
+        return;
+      }
+
+      const result = await apiCall(`/api/organizations/${orgId}/users/${selectedUser.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(editUserForm)
+      });
+
+      alert(`✅ User updated successfully!\n\nUsername: ${result.user.username}\nRole: ${result.user.role}\nStatus: ${result.user.is_active ? 'Active' : 'Inactive'}`);
+      
+      setShowEditUserModal(false);
+      setSelectedUser(null);
+      setEditUserForm({
+        role: '',
+        assigned_communities: [],
+        full_name: '',
+        is_active: true
+      });
+      
+      // Reload users
+      await loadUsers();
+    } catch (error) {
+      alert('Failed to update user: ' + (error as Error).message);
     }
   };
 
@@ -720,8 +782,10 @@ export default function AdminDashboard() {
                             <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Email</th>
                             <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Organization</th>
                             <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Role</th>
+                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Communities</th>
                             <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Status</th>
                             <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Last Login</th>
+                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -737,22 +801,53 @@ export default function AdminDashboard() {
                               <td className="py-3 text-sm text-gray-600 dark:text-gray-400">{user.organization?.name || '-'}</td>
                               <td className="py-3">
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  user.role === 'super_admin' ? 'bg-blue-100 text-blue-800' :
-                                  user.role === 'org_admin' ? 'bg-orange-100 text-orange-800' :
-                                  'bg-green-100 text-green-800'
+                                  user.role === 'super_admin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                  user.role === 'org_admin' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
+                                  user.role === 'community_lead' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
+                                  'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                                 }`}>
                                   {user.role.replace('_', ' ').toUpperCase()}
                                 </span>
                               </td>
                               <td className="py-3">
+                                {user.role === 'community_lead' && user.assigned_communities ? (
+                                  <div className="flex gap-1 flex-wrap max-w-[200px]">
+                                    {JSON.parse(user.assigned_communities).map((comm: string) => (
+                                      <span key={comm} className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                        {comm}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-gray-400">-</span>
+                                )}
+                              </td>
+                              <td className="py-3">
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                  user.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                 }`}>
                                   {user.is_active ? 'ACTIVE' : 'INACTIVE'}
                                 </span>
                               </td>
                               <td className="py-3 text-sm text-gray-600 dark:text-gray-400">
                                 {user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
+                              </td>
+                              <td className="py-3">
+                                <button
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setEditUserForm({
+                                      role: user.role,
+                                      assigned_communities: user.assigned_communities ? JSON.parse(user.assigned_communities) : [],
+                                      full_name: user.full_name,
+                                      is_active: user.is_active
+                                    });
+                                    setShowEditUserModal(true);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
+                                >
+                                  ✏️ Edit
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -1129,12 +1224,70 @@ export default function AdminDashboard() {
                   <select
                     required
                     value={createUserForm.role}
-                    onChange={(e) => setCreateUserForm(prev => ({ ...prev, role: e.target.value }))}
+                    onChange={(e) => setCreateUserForm(prev => ({ ...prev, role: e.target.value, assigned_communities: [] }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="user">User</option>
+                    <option value="community_lead">Community Lead</option>
                     <option value="org_admin">Organization Admin</option>
                   </select>
+                </div>
+              )}
+              {currentUser?.role === 'org_admin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Role *
+                  </label>
+                  <select
+                    required
+                    value={createUserForm.role}
+                    onChange={(e) => setCreateUserForm(prev => ({ ...prev, role: e.target.value, assigned_communities: [] }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="user">User</option>
+                    <option value="community_lead">Community Lead</option>
+                  </select>
+                </div>
+              )}
+              {(currentUser?.role === 'org_admin' || currentUser?.role === 'super_admin') && createUserForm.role === 'community_lead' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Assigned Communities *
+                  </label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3 bg-gray-50 dark:bg-gray-900">
+                    {[
+                      { id: 'qa', name: 'QA Engineers', icon: '🎯' },
+                      { id: 'backend', name: 'Backend Developers', icon: '🔧' },
+                      { id: 'frontend', name: 'Frontend Developers', icon: '🎨' },
+                      { id: 'design', name: 'UI/UX Designers', icon: '✨' },
+                      { id: 'product', name: 'Product Managers', icon: '📊' },
+                      { id: 'devops', name: 'DevOps Engineers', icon: '🔐' },
+                      { id: 'docs', name: 'Technical Writers', icon: '📝' }
+                    ].map((community) => (
+                      <label key={community.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={createUserForm.assigned_communities.includes(community.id)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setCreateUserForm(prev => ({
+                              ...prev,
+                              assigned_communities: checked
+                                ? [...prev.assigned_communities, community.id]
+                                : prev.assigned_communities.filter(c => c !== community.id)
+                            }));
+                          }}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-900 dark:text-white">
+                          {community.icon} {community.name}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Select at least one community for this Community Lead
+                  </p>
                 </div>
               )}
               <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
@@ -1152,7 +1305,8 @@ export default function AdminDashboard() {
                       email: '',
                       password: '',
                       full_name: '',
-                      role: 'user'
+                      role: 'user',
+                      assigned_communities: []
                     });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
@@ -1164,6 +1318,168 @@ export default function AdminDashboard() {
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Create User
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditUserModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full m-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Edit User
+            </h3>
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={selectedUser.username}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-500 cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={selectedUser.email}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-500 cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editUserForm.full_name}
+                  onChange={(e) => setEditUserForm(prev => ({ ...prev, full_name: e.target.value }))}
+                  placeholder="John Doe"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              {currentUser?.role === 'super_admin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Role *
+                  </label>
+                  <select
+                    required
+                    value={editUserForm.role}
+                    onChange={(e) => setEditUserForm(prev => ({ ...prev, role: e.target.value, assigned_communities: [] }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="user">User</option>
+                    <option value="community_lead">Community Lead</option>
+                    <option value="org_admin">Organization Admin</option>
+                  </select>
+                </div>
+              )}
+              {currentUser?.role === 'org_admin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Role *
+                  </label>
+                  <select
+                    required
+                    value={editUserForm.role}
+                    onChange={(e) => setEditUserForm(prev => ({ ...prev, role: e.target.value, assigned_communities: [] }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="user">User</option>
+                    <option value="community_lead">Community Lead</option>
+                  </select>
+                </div>
+              )}
+              {(currentUser?.role === 'org_admin' || currentUser?.role === 'super_admin') && editUserForm.role === 'community_lead' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Assigned Communities *
+                  </label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3 bg-gray-50 dark:bg-gray-900">
+                    {[
+                      { id: 'qa', name: 'QA Engineers', icon: '🎯' },
+                      { id: 'backend', name: 'Backend Developers', icon: '🔧' },
+                      { id: 'frontend', name: 'Frontend Developers', icon: '🎨' },
+                      { id: 'design', name: 'UI/UX Designers', icon: '✨' },
+                      { id: 'product', name: 'Product Managers', icon: '📊' },
+                      { id: 'devops', name: 'DevOps Engineers', icon: '🔐' },
+                      { id: 'docs', name: 'Technical Writers', icon: '📝' }
+                    ].map((community) => (
+                      <label key={community.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={editUserForm.assigned_communities.includes(community.id)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setEditUserForm(prev => ({
+                              ...prev,
+                              assigned_communities: checked
+                                ? [...prev.assigned_communities, community.id]
+                                : prev.assigned_communities.filter(c => c !== community.id)
+                            }));
+                          }}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-900 dark:text-white">
+                          {community.icon} {community.name}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Select at least one community for this Community Lead
+                  </p>
+                </div>
+              )}
+              <div>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editUserForm.is_active}
+                    onChange={(e) => setEditUserForm(prev => ({ ...prev, is_active: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    User is Active
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
+                  Inactive users cannot log in
+                </p>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditUserModal(false);
+                    setSelectedUser(null);
+                    setEditUserForm({
+                      role: '',
+                      assigned_communities: [],
+                      full_name: '',
+                      is_active: true
+                    });
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Update User
                 </button>
               </div>
             </form>
