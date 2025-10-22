@@ -166,6 +166,15 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
+    # Check if organization is blocked
+    if user.organization_id:
+        org = db.query(Organization).filter(Organization.id == user.organization_id).first()
+        if org and not org.is_active:
+            raise HTTPException(
+                status_code=403, 
+                detail="Your organization has been blocked. Please contact support."
+            )
+    
     user.last_login = datetime.utcnow()
     db.commit()
     
@@ -238,7 +247,10 @@ async def register(register_data: RegisterRequest, db: Session = Depends(get_db)
         if not org:
             raise HTTPException(status_code=404, detail="Organization not found")
         if not org.is_active:
-            raise HTTPException(status_code=403, detail="Organization is inactive")
+            raise HTTPException(
+                status_code=403, 
+                detail="Organization is blocked. New registrations are not allowed."
+            )
         
         # Check user limit
         user_count = db.query(User).filter(User.organization_id == org.id).count()
@@ -1072,6 +1084,59 @@ async def create_organization_user(
             "role": new_user.role.value,
             "organization_id": new_user.organization_id,
             "is_active": new_user.is_active
+        }
+    }
+
+
+@app.patch("/api/organizations/{org_id}/block", tags=["Organizations"])
+async def block_organization(
+    org_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_super_admin_user)
+):
+    """Block an organization (Super Admin only)"""
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    if org.id == 1:
+        raise HTTPException(status_code=403, detail="Cannot block default organization")
+    
+    org.is_active = False
+    db.commit()
+    db.refresh(org)
+    
+    return {
+        "message": "Organization blocked successfully",
+        "organization": {
+            "id": org.id,
+            "name": org.name,
+            "is_active": org.is_active
+        }
+    }
+
+
+@app.patch("/api/organizations/{org_id}/unblock", tags=["Organizations"])
+async def unblock_organization(
+    org_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_super_admin_user)
+):
+    """Unblock an organization (Super Admin only)"""
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    org.is_active = True
+    db.commit()
+    db.refresh(org)
+    
+    return {
+        "message": "Organization unblocked successfully",
+        "organization": {
+            "id": org.id,
+            "name": org.name,
+            "is_active": org.is_active
         }
     }
 

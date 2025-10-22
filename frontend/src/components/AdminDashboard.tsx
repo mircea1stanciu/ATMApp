@@ -637,6 +637,42 @@ export default function AdminDashboard() {
                                     </button>
                                   )}
                                   {currentUser?.role === 'super_admin' && org.id !== 1 && (
+                                    org.is_active ? (
+                                      <button 
+                                        onClick={async () => {
+                                          if (!confirm(`⚠️ Block "${org.name}"?\n\nThis will prevent all users from logging in and new registrations.`)) {
+                                            return;
+                                          }
+                                          try {
+                                            await apiCall(`/api/organizations/${org.id}/block`, { method: 'PATCH' });
+                                            alert(`✅ Organization "${org.name}" has been blocked.`);
+                                            await loadOrganizations();
+                                          } catch (error) {
+                                            alert('Failed to block organization: ' + (error as Error).message);
+                                          }
+                                        }}
+                                        className="px-3 py-1 bg-orange-100 text-orange-700 rounded text-xs hover:bg-orange-200 transition-colors"
+                                      >
+                                        🚫 Block
+                                      </button>
+                                    ) : (
+                                      <button 
+                                        onClick={async () => {
+                                          try {
+                                            await apiCall(`/api/organizations/${org.id}/unblock`, { method: 'PATCH' });
+                                            alert(`✅ Organization "${org.name}" has been unblocked.`);
+                                            await loadOrganizations();
+                                          } catch (error) {
+                                            alert('Failed to unblock organization: ' + (error as Error).message);
+                                          }
+                                        }}
+                                        className="px-3 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 transition-colors"
+                                      >
+                                        ✅ Unblock
+                                      </button>
+                                    )
+                                  )}
+                                  {currentUser?.role === 'super_admin' && org.id !== 1 && (
                                     <button 
                                       onClick={() => handleDeleteOrg(org.id, org.name)}
                                       className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 transition-colors"
