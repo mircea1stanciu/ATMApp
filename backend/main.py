@@ -1065,11 +1065,11 @@ async def create_organization_user(
             role_value = user_data["role"].upper()
             if role_value in ["ORG_ADMIN", "COMMUNITY_LEAD", "USER"]:
                 user_role = UserRole[role_value]
-                
-                # If creating community lead, handle community assignments
-                if user_role == UserRole.COMMUNITY_LEAD and user_data.get("assigned_communities"):
-                    import json
-                    assigned_communities = json.dumps(user_data["assigned_communities"])
+        
+        # Handle community assignments for community leads and regular users
+        if (user_role == UserRole.COMMUNITY_LEAD or user_role == UserRole.USER) and user_data.get("assigned_communities"):
+            import json
+            assigned_communities = json.dumps(user_data["assigned_communities"])
         
         # Only super admins can create org admins
         if user_role == UserRole.ORG_ADMIN and current_user.role != UserRole.SUPER_ADMIN:
@@ -1137,12 +1137,13 @@ async def update_organization_user(
             
             user.role = new_role
     
-    # Update assigned communities for community leads
+    # Update assigned communities for community leads and regular users
     if user_data.get("assigned_communities") is not None:
-        if user.role == UserRole.COMMUNITY_LEAD:
+        if user.role == UserRole.COMMUNITY_LEAD or user.role == UserRole.USER:
             import json
             user.assigned_communities = json.dumps(user_data["assigned_communities"])
         else:
+            # Org admins and super admins don't have assigned communities
             user.assigned_communities = None
     
     # Update other fields if provided
