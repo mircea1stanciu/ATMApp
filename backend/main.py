@@ -1168,6 +1168,42 @@ async def update_organization_user(
     }
 
 
+@app.delete("/api/organizations/{org_id}/users/{user_id}", tags=["Organizations"])
+async def delete_organization_user(
+    org_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_super_admin_user)
+):
+    """Delete a user from an organization (Super Admin only)"""
+    # Get user
+    user = db.query(User).filter(User.id == user_id, User.organization_id == org_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Prevent deleting super admins
+    if user.role == UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Cannot delete super admin users")
+    
+    # Prevent deleting yourself
+    if user.id == current_user.id:
+        raise HTTPException(status_code=403, detail="Cannot delete yourself")
+    
+    username = user.username
+    
+    # Delete user's chat sessions first (cascade)
+    db.query(ChatSession).filter(ChatSession.user_id == user_id).delete()
+    
+    # Delete user
+    db.delete(user)
+    db.commit()
+    
+    return {
+        "message": "User deleted successfully",
+        "username": username
+    }
+
+
 @app.patch("/api/organizations/{org_id}/block", tags=["Organizations"])
 async def block_organization(
     org_id: int,

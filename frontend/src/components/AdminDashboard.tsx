@@ -108,6 +108,14 @@ export default function AdminDashboard() {
 
       const user = await response.json();
       setCurrentUser(user);
+      
+      // Debug: Log user information for troubleshooting
+      console.log('🔍 Current User Info:', {
+        username: user.username,
+        role: user.role,
+        organization_id: user.organization_id,
+        organization_name: user.organization?.name
+      });
 
       if (user.role !== 'super_admin' && user.role !== 'org_admin') {
         router.push('/');
@@ -213,37 +221,47 @@ export default function AdminDashboard() {
       if (currentUser?.role === 'org_admin') {
         // Org admins can only see users from their organization
         if (currentUser.organization?.id) {
+          console.log(`📋 Loading users for organization ID: ${currentUser.organization.id}`);
           const orgUsers = await apiCall(`/api/organizations/${currentUser.organization.id}/users`);
           const usersWithOrg = orgUsers.map((user: User) => ({
             ...user,
-            organization: { name: currentUser.organization?.name || '' }
+            organization: { id: currentUser.organization?.id, name: currentUser.organization?.name || '' }
           }));
           setUsers(usersWithOrg);
+        } else {
+          console.error('❌ Org Admin has no organization ID');
+          alert('❌ Error: Your account is not associated with an organization. Please contact support.');
         }
       } else {
         // Super admins can see users from all organizations
         const orgs = await apiCall('/api/organizations');
+        console.log(`📋 Super Admin: Loading users from ${orgs.length} organizations:`, orgs.map((o: Organization) => `${o.name} (ID: ${o.id})`));
         let allUsers: User[] = [];
         
         // Fetch users for each organization
         for (const org of orgs) {
           try {
+            console.log(`  ↳ Fetching users for ${org.name} (ID: ${org.id})...`);
             const orgUsers = await apiCall(`/api/organizations/${org.id}/users`);
+            console.log(`    ✅ Loaded ${orgUsers.length} users`);
             // Add organization info to each user
             const usersWithOrg = orgUsers.map((user: User) => ({
               ...user,
-              organization: { name: org.name }
+              organization: { id: org.id, name: org.name }
             }));
             allUsers = [...allUsers, ...usersWithOrg];
           } catch (err) {
-            console.error(`Failed to load users for ${org.name}:`, err);
+            console.error(`    ❌ Failed to load users for ${org.name} (ID: ${org.id}):`, err);
+            // Continue loading other organizations even if one fails
           }
         }
         
+        console.log(`✅ Total users loaded: ${allUsers.length}`);
         setUsers(allUsers);
       }
     } catch (error) {
-      console.error('Failed to load users:', error);
+      console.error('❌ Failed to load users:', error);
+      alert('❌ Failed to load users: ' + (error as Error).message);
     }
   };
 
@@ -415,6 +433,31 @@ export default function AdminDashboard() {
       await loadUsers();
     } catch (error) {
       alert('Failed to update user: ' + (error as Error).message);
+    }
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    if (!confirm(`⚠️ Are you sure you want to delete user "${user.username}"?\n\nThis will permanently delete:\n- The user account\n- All their chat sessions\n\nThis action cannot be undone!`)) {
+      return;
+    }
+
+    try {
+      const orgId = user.organization?.id;
+      if (!orgId) {
+        alert('❌ User organization not found');
+        return;
+      }
+
+      await apiCall(`/api/organizations/${orgId}/users/${user.id}`, {
+        method: 'DELETE'
+      });
+
+      alert(`✅ User "${user.username}" deleted successfully`);
+      
+      // Reload users
+      await loadUsers();
+    } catch (error) {
+      alert('Failed to delete user: ' + (error as Error).message);
     }
   };
 
@@ -837,21 +880,31 @@ export default function AdminDashboard() {
                                 {user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
                               </td>
                               <td className="py-3">
-                                <button
-                                  onClick={() => {
-                                    setSelectedUser(user);
-                                    setEditUserForm({
-                                      role: user.role,
-                                      assigned_communities: user.assigned_communities ? JSON.parse(user.assigned_communities) : [],
-                                      full_name: user.full_name,
-                                      is_active: user.is_active
-                                    });
-                                    setShowEditUserModal(true);
-                                  }}
-                                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
-                                >
-                                  ✏️ Edit
-                                </button>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedUser(user);
+                                      setEditUserForm({
+                                        role: user.role,
+                                        assigned_communities: user.assigned_communities ? JSON.parse(user.assigned_communities) : [],
+                                        full_name: user.full_name,
+                                        is_active: user.is_active
+                                      });
+                                      setShowEditUserModal(true);
+                                    }}
+                                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
+                                  >
+                                    ✏️ Edit
+                                  </button>
+                                  {currentUser?.role === 'super_admin' && user.role !== 'super_admin' && user.id !== currentUser.id && (
+                                    <button
+                                      onClick={() => handleDeleteUser(user)}
+                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium"
+                                    >
+                                      🗑️ Delete
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           ))}
