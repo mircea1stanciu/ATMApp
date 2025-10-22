@@ -103,7 +103,7 @@ export default function HomePage() {
     let isScrolling = false
     let scrollTimeout: NodeJS.Timeout
     let scrollAccumulator = 0
-    const scrollThreshold = 100 // Require more scroll distance before changing sections
+    const scrollThreshold = 50 // Reduced threshold for more responsiveness
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
@@ -140,11 +140,11 @@ export default function HomePage() {
         scrollAccumulator = 0 // Reset accumulator
         setActiveSection(sections[newIndex])
         
-        // Reset scrolling flag after animation with longer debounce
+        // Reset scrolling flag after animation with moderate debounce
         clearTimeout(scrollTimeout)
         scrollTimeout = setTimeout(() => {
           isScrolling = false
-        }, 800) // Increased from 600ms for better control
+        }, 700) // Balanced timing between responsiveness and control
       } else {
         // Reset accumulator if we can't go further
         scrollAccumulator = 0
@@ -194,7 +194,7 @@ export default function HomePage() {
           clearTimeout(scrollTimeout)
           scrollTimeout = setTimeout(() => {
             isScrolling = false
-          }, 800) // Match wheel handler timeout
+          }, 700) // Match wheel handler timeout
         }
       }
     }
@@ -230,7 +230,7 @@ export default function HomePage() {
         clearTimeout(scrollTimeout)
         scrollTimeout = setTimeout(() => {
           isScrolling = false
-        }, 800) // Match wheel handler timeout
+        }, 700) // Match wheel handler timeout
       }
     }
 
