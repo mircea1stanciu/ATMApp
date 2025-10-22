@@ -102,9 +102,8 @@ export default function HomePage() {
     
     let isScrolling = false
     let scrollTimeout: NodeJS.Timeout
-    let resetTimeout: NodeJS.Timeout
     let scrollAccumulator = 0
-    const scrollThreshold = 50 // Moderate threshold
+    const scrollThreshold = 100 // Require more scroll distance before changing sections
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
@@ -113,12 +112,6 @@ export default function HomePage() {
       
       // Accumulate scroll delta
       scrollAccumulator += e.deltaY
-      
-      // Auto-reset accumulator if no scroll for a short time
-      clearTimeout(resetTimeout)
-      resetTimeout = setTimeout(() => {
-        scrollAccumulator = 0
-      }, 150) // Reset if user pauses scrolling
       
       // Only change section if threshold is exceeded
       if (Math.abs(scrollAccumulator) < scrollThreshold) {
@@ -129,33 +122,33 @@ export default function HomePage() {
       let newIndex = currentIndex
 
       if (scrollAccumulator > 0) {
-        // Scroll down - next section ONLY
-        newIndex = currentIndex + 1
-        if (newIndex >= sections.length) {
-          scrollAccumulator = 0
-          return
+        // Scroll down - next section
+        newIndex = Math.min(currentIndex + 1, sections.length - 1)
+        if (newIndex !== currentIndex) {
+          setAnimationDirection('down')
         }
-        setAnimationDirection('down')
       } else {
-        // Scroll up - previous section ONLY
-        newIndex = currentIndex - 1
-        if (newIndex < 0) {
-          scrollAccumulator = 0
-          return
+        // Scroll up - previous section
+        newIndex = Math.max(currentIndex - 1, 0)
+        if (newIndex !== currentIndex) {
+          setAnimationDirection('up')
         }
-        setAnimationDirection('up')
       }
 
-      // Change section and lock scrolling
-      isScrolling = true
-      scrollAccumulator = 0 // Immediately reset accumulator
-      setActiveSection(sections[newIndex])
-      
-      // Reset scrolling flag after animation - 1 second stop
-      clearTimeout(scrollTimeout)
-      scrollTimeout = setTimeout(() => {
-        isScrolling = false
-      }, 1000) // Full 1 second stop to prevent skipping
+      if (newIndex !== currentIndex) {
+        isScrolling = true
+        scrollAccumulator = 0 // Reset accumulator
+        setActiveSection(sections[newIndex])
+        
+        // Reset scrolling flag after animation with longer debounce
+        clearTimeout(scrollTimeout)
+        scrollTimeout = setTimeout(() => {
+          isScrolling = false
+        }, 800) // Increased from 600ms for better control
+      } else {
+        // Reset accumulator if we can't go further
+        scrollAccumulator = 0
+      }
     }
 
     // Add wheel event listener
@@ -201,7 +194,7 @@ export default function HomePage() {
           clearTimeout(scrollTimeout)
           scrollTimeout = setTimeout(() => {
             isScrolling = false
-          }, 1000) // 1 second stop between sections
+          }, 800) // Match wheel handler timeout
         }
       }
     }
@@ -237,7 +230,7 @@ export default function HomePage() {
         clearTimeout(scrollTimeout)
         scrollTimeout = setTimeout(() => {
           isScrolling = false
-        }, 1000) // 1 second stop between sections
+        }, 800) // Match wheel handler timeout
       }
     }
 
@@ -252,7 +245,6 @@ export default function HomePage() {
       window.removeEventListener('touchend', handleTouchEnd)
       window.removeEventListener('keydown', handleKeyDown)
       clearTimeout(scrollTimeout)
-      clearTimeout(resetTimeout)
     }
   }, [activeSection, sections])
 
@@ -283,16 +275,16 @@ export default function HomePage() {
         </div>
 
         {/* Scroll Hints */}
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40 text-center">
+        <div className="fixed bottom-4 sm:bottom-6 left-1/2 transform -translate-x-1/2 z-40 text-center">
           <div className="flex flex-col items-center space-y-2 text-gray-500 dark:text-gray-400">
             {activeSection !== sections[sections.length - 1] && (
               <div className="animate-bounce">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m0 0l7-7" />
                 </svg>
               </div>
             )}
-            <span className="text-xs font-medium">
+            <span className="text-[10px] sm:text-xs font-medium px-2">
               {activeSection === 'hero' && 'Scroll down to explore'}
               {activeSection === 'communities' && 'Scroll up/down to navigate'}
               {activeSection === 'about' && 'Scroll up to go back'}
@@ -301,34 +293,34 @@ export default function HomePage() {
         </div>
         {/* Hero Section */}
         {(activeSection === 'hero' || !activeSection) && (
-          <section className={`bg-white dark:bg-surface-800 px-6 py-12 h-full flex items-center ${
+          <section className={`bg-white dark:bg-surface-800 px-4 sm:px-6 py-8 sm:py-12 min-h-[calc(100vh-4rem)] flex items-center overflow-y-auto ${
             animationDirection === 'down' ? 'animate-slideInFromBottom' : 'animate-slideInFromTop'
           }`}>
             <div className="max-w-7xl mx-auto text-center w-full">
-              <div className="flex items-center justify-center space-x-3 mb-6">
-                <span className="text-5xl">🚀</span>
+              <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-3 mb-6">
+                <span className="text-4xl sm:text-5xl">🚀</span>
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
                     Welcome to UnifiedWork
                   </h1>
-                  <p className="text-lg text-gray-600 dark:text-gray-400 mt-2">
+                  <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 mt-2">
                     AI-Powered Unified Workspace for Tech Teams
                   </p>
                 </div>
               </div>
-              <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto mb-8">
+              <p className="text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto mb-6 sm:mb-8 px-4">
                 Choose your community and start working with your specialized AI assistant
               </p>
               
               {/* Navigation Cards */}
-              <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto mt-12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-2xl mx-auto mt-8 sm:mt-12 px-4">
                 <button
                   onClick={() => handleSectionChange('communities')}
-                  className="group bg-gradient-to-r from-blue-500 to-purple-600 text-white p-8 rounded-xl hover:shadow-lg transition-all duration-300 hover:scale-105"
+                  className="group bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 sm:p-8 rounded-xl hover:shadow-lg transition-all duration-300 hover:scale-105"
                 >
-                  <div className="text-4xl mb-4">🏘️</div>
-                  <h3 className="text-xl font-bold mb-2">Explore Communities</h3>
-                  <p className="text-blue-100">Discover specialized AI agents for your role</p>
+                  <div className="text-3xl sm:text-4xl mb-3 sm:mb-4">🏘️</div>
+                  <h3 className="text-lg sm:text-xl font-bold mb-2">Explore Communities</h3>
+                  <p className="text-sm sm:text-base text-blue-100">Discover specialized AI agents for your role</p>
                   <div className="mt-4 flex items-center justify-center">
                     <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -338,11 +330,11 @@ export default function HomePage() {
 
                 <button
                   onClick={() => handleSectionChange('about')}
-                  className="group bg-gradient-to-r from-green-500 to-teal-600 text-white p-8 rounded-xl hover:shadow-lg transition-all duration-300 hover:scale-105"
+                  className="group bg-gradient-to-r from-green-500 to-teal-600 text-white p-6 sm:p-8 rounded-xl hover:shadow-lg transition-all duration-300 hover:scale-105"
                 >
-                  <div className="text-4xl mb-4">🎯</div>
-                  <h3 className="text-xl font-bold mb-2">Learn More</h3>
-                  <p className="text-green-100">Discover how AI enhances team collaboration</p>
+                  <div className="text-3xl sm:text-4xl mb-3 sm:mb-4">🎯</div>
+                  <h3 className="text-lg sm:text-xl font-bold mb-2">Learn More</h3>
+                  <p className="text-sm sm:text-base text-green-100">Discover how AI enhances team collaboration</p>
                   <div className="mt-4 flex items-center justify-center">
                     <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -352,15 +344,15 @@ export default function HomePage() {
               </div>
 
               {/* Welcome Footer */}
-              <div className="mt-16 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl p-8 max-w-4xl mx-auto">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              <div className="mt-12 sm:mt-16 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl p-6 sm:p-8 max-w-4xl mx-auto">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
                   🎊 Welcome to the Future of Tech Collaboration
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4 sm:mb-6 leading-relaxed">
                   You're not just using software - you're experiencing the future of tech collaboration. 
                   Each AI agent is specialized for your role, trained on best practices, and ready to help you excel.
                 </p>
-                <div className="flex items-center justify-center space-x-6 text-sm">
+                <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-6 text-xs sm:text-sm">
                   <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
                     <span className="text-lg">🚀</span>
                     <span className="font-medium">Start small</span>
@@ -380,21 +372,21 @@ export default function HomePage() {
         )}
         {/* Communities Section */}
         {activeSection === 'communities' && (
-          <section className={`bg-white dark:bg-surface-800 px-6 py-12 h-full overflow-y-auto ${
+          <section className={`bg-white dark:bg-surface-800 px-4 sm:px-6 py-8 sm:py-12 min-h-[calc(100vh-4rem)] overflow-y-auto ${
             animationDirection === 'down' ? 'animate-slideInFromBottom' : 'animate-slideInFromTop'
           }`}>
             <div className="max-w-7xl mx-auto">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+              <div className="text-center mb-8 sm:mb-12">
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
                   🏘️ Choose Your Community
                 </h2>
-                <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto px-4">
                   Each community has a specialized AI agent trained to understand your specific needs and challenges
                 </p>
               </div>
 
               {/* Communities Grid */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
                 {communities.map((community) => (
                   <Link
                     key={community.id}
@@ -447,21 +439,21 @@ export default function HomePage() {
 
         {/* About Section */}
         {activeSection === 'about' && (
-          <section className={`bg-white dark:bg-surface-800 px-6 py-12 h-full overflow-y-auto ${
+          <section className={`bg-white dark:bg-surface-800 px-4 sm:px-6 py-8 sm:py-12 min-h-[calc(100vh-4rem)] overflow-y-auto ${
             animationDirection === 'down' ? 'animate-slideInFromBottom' : 'animate-slideInFromTop'
           }`}>
             <div className="max-w-7xl mx-auto">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+              <div className="text-center mb-8 sm:mb-12">
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
                   🎯 Your Mission
                 </h2>
-                <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto px-4">
                   UnifiedWork is not just a platform - it's a vision of how tech teams should work together, enhanced by AI
                 </p>
               </div>
 
-              <div className="max-w-4xl mx-auto grid md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm mb-12">
-                <div className="bg-white dark:bg-surface-800 p-6 rounded-lg border border-gray-200 dark:border-gray-600 text-center">
+              <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 text-xs sm:text-sm mb-8 sm:mb-12">
+                <div className="bg-white dark:bg-surface-800 p-4 sm:p-6 rounded-lg border border-gray-200 dark:border-gray-600 text-center">
                   <div className="text-2xl mb-3">👨‍💻</div>
                   <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Developers</h3>
                   <p className="text-gray-600 dark:text-gray-400">Get instant code help and architecture guidance</p>
