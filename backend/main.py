@@ -993,6 +993,89 @@ async def list_organization_users(
     } for user in users]
 
 
+@app.post("/api/organizations/{org_id}/users", tags=["Organizations"])
+async def create_organization_user(
+    org_id: int,
+    user_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_org_admin_user)
+):
+    """Create a new user in an organization (Org Admin or Super Admin)"""
+    # Verify user has permission
+    if current_user.role != UserRole.SUPER_ADMIN:
+        if current_user.organization_id != org_id:
+            raise HTTPException(status_code=403, detail="Not authorized to create users in this organization")
+    
+    # Get organization
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    if not org.is_active:
+        raise HTTPException(status_code=403, detail="Organization is not active")
+    
+    # Check user limit
+    user_count = db.query(User).filter(User.organization_id == org_id).count()
+    if user_count >= org.max_users:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Organization has reached maximum user limit ({org.max_users})"
+        )
+    
+    # Validate required fields
+    required_fields = ["username", "email", "password", "full_name"]
+    for field in required_fields:
+        if field not in user_data or not user_data[field]:
+            raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+    
+    # Check if email already exists
+    if db.query(User).filter(User.email == user_data["email"]).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Check if username exists within organization
+    if db.query(User).filter(
+        User.username == user_data["username"],
+        User.organization_id == org_id
+    ).first():
+        raise HTTPException(status_code=400, detail="Username already taken in this organization")
+    
+    # Determine user role (org_admins can only create regular users, not other admins)
+    user_role = UserRole.USER
+    if current_user.role == UserRole.SUPER_ADMIN and user_data.get("role"):
+        # Super admins can specify role
+        role_value = user_data["role"].upper()
+        if role_value in ["ORG_ADMIN", "USER"]:
+            user_role = UserRole[role_value]
+    
+    # Create new user
+    new_user = User(
+        username=user_data["username"],
+        email=user_data["email"],
+        hashed_password=User.hash_password(user_data["password"]),
+        full_name=user_data["full_name"],
+        role=user_role,
+        organization_id=org_id,
+        is_active=True
+    )
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return {
+        "message": "User created successfully",
+        "user": {
+            "id": new_user.id,
+            "username": new_user.username,
+            "email": new_user.email,
+            "full_name": new_user.full_name,
+            "role": new_user.role.value,
+            "organization_id": new_user.organization_id,
+            "is_active": new_user.is_active
+        }
+    }
+
+
 @app.get("/api/organizations/{org_id}/stats", tags=["Organizations"])
 async def get_organization_stats(
     org_id: int,

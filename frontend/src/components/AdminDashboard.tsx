@@ -51,6 +51,14 @@ export default function AdminDashboard() {
   const [orgStats, setOrgStats] = useState<any>(null);
   const [showChangePlanModal, setShowChangePlanModal] = useState(false);
   const [newPlan, setNewPlan] = useState('');
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({
+    username: '',
+    email: '',
+    password: '',
+    full_name: '',
+    role: 'user'
+  });
   const [createOrgForm, setCreateOrgForm] = useState({
     name: '',
     slug: '',
@@ -306,6 +314,41 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       alert('Failed to update subscription plan: ' + (error as Error).message);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const orgId = currentUser?.role === 'org_admin' 
+        ? currentUser.organization?.id 
+        : organizations[0]?.id; // For super_admin, use first org or could add org selector
+
+      if (!orgId) {
+        alert('No organization available for user creation');
+        return;
+      }
+
+      const result = await apiCall(`/api/organizations/${orgId}/users`, {
+        method: 'POST',
+        body: JSON.stringify(createUserForm)
+      });
+
+      alert(`✅ User created successfully!\n\nUsername: ${result.user.username}\nEmail: ${result.user.email}\nRole: ${result.user.role}`);
+      
+      setShowCreateUserModal(false);
+      setCreateUserForm({
+        username: '',
+        email: '',
+        password: '',
+        full_name: '',
+        role: 'user'
+      });
+      
+      // Reload users
+      await loadUsers();
+    } catch (error) {
+      alert('Failed to create user: ' + (error as Error).message);
     }
   };
 
@@ -618,8 +661,14 @@ export default function AdminDashboard() {
           {activeSection === 'users' && (
             <div className="space-y-6">
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Users Management</h3>
+                  <button
+                    onClick={() => setShowCreateUserModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    ➕ Create User
+                  </button>
                 </div>
                 <div className="p-6">
                   {users.length === 0 ? (
@@ -965,6 +1014,120 @@ export default function AdminDashboard() {
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Update Plan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {showCreateUserModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full m-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Create New User
+            </h3>
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Username *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={createUserForm.username}
+                  onChange={(e) => setCreateUserForm(prev => ({ ...prev, username: e.target.value }))}
+                  placeholder="john_doe"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={createUserForm.email}
+                  onChange={(e) => setCreateUserForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="john@example.com"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={createUserForm.full_name}
+                  onChange={(e) => setCreateUserForm(prev => ({ ...prev, full_name: e.target.value }))}
+                  placeholder="John Doe"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={createUserForm.password}
+                  onChange={(e) => setCreateUserForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="••••••••"
+                  minLength={6}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Minimum 6 characters
+                </p>
+              </div>
+              {currentUser?.role === 'super_admin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Role *
+                  </label>
+                  <select
+                    required
+                    value={createUserForm.role}
+                    onChange={(e) => setCreateUserForm(prev => ({ ...prev, role: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="user">User</option>
+                    <option value="org_admin">Organization Admin</option>
+                  </select>
+                </div>
+              )}
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                <p className="text-xs text-gray-700 dark:text-gray-300">
+                  ℹ️ <strong>Note:</strong> The user will be created in {currentUser?.role === 'org_admin' ? 'your organization' : 'the first available organization'}.
+                </p>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateUserModal(false);
+                    setCreateUserForm({
+                      username: '',
+                      email: '',
+                      password: '',
+                      full_name: '',
+                      role: 'user'
+                    });
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Create User
                 </button>
               </div>
             </form>
