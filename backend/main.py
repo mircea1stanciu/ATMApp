@@ -319,6 +319,9 @@ async def register_org_admin(register_data: dict, db: Session = Depends(get_db))
         if field not in register_data:
             raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
     
+    # Debug logging
+    print(f"🔍 Registration attempt with access_token: {register_data['access_token'][:20]}...")
+    
     # Find organization by access token
     org = db.query(Organization).filter(
         Organization.access_token == register_data["access_token"]
@@ -326,6 +329,8 @@ async def register_org_admin(register_data: dict, db: Session = Depends(get_db))
     
     if not org:
         raise HTTPException(status_code=400, detail="Invalid access token")
+    
+    print(f"✅ Found organization: ID={org.id}, Name={org.name}, Slug={org.slug}")
     
     if not org.is_active:
         raise HTTPException(status_code=403, detail="Organization is not active")
@@ -361,9 +366,13 @@ async def register_org_admin(register_data: dict, db: Session = Depends(get_db))
         is_active=True
     )
     
+    print(f"💾 Creating user with organization_id={org.id}")
+    
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    print(f"✅ User created: ID={new_user.id}, organization_id={new_user.organization_id}")
     
     # Create JWT token
     access_token = create_access_token(
