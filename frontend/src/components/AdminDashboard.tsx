@@ -71,7 +71,9 @@ export default function AdminDashboard() {
     confirm_password: '',
     full_name: '',
     role: 'user',
-    assigned_communities: [] as string[]
+    assigned_communities: [] as string[],
+    organization_slug: '',
+    access_token: ''
   });
   const [createOrgForm, setCreateOrgForm] = useState({
     name: '',
@@ -364,10 +366,117 @@ export default function AdminDashboard() {
       return;
     }
     
+    // Super Admin creating Organization Admin - use register-org-admin endpoint
+    if (currentUser?.role === 'super_admin' && createUserForm.role === 'org_admin') {
+      if (!createUserForm.access_token) {
+        alert('❌ Organization Access Token is required for Organization Admin');
+        return;
+      }
+      
+      try {
+        const response = await fetch('http://localhost:8000/api/auth/register-org-admin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            access_token: createUserForm.access_token,
+            username: createUserForm.username,
+            email: createUserForm.email,
+            password: createUserForm.password,
+            full_name: createUserForm.full_name
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.detail || 'Failed to create Organization Admin');
+        }
+
+        const result = await response.json();
+        alert(`✅ Organization Admin created successfully!\n\nUsername: ${result.user.username}\nEmail: ${result.user.email}\nOrganization: ${result.user.organization?.name || 'N/A'}`);
+        
+        setShowCreateUserModal(false);
+        setCreateUserForm({
+          username: '',
+          email: '',
+          password: '',
+          confirm_password: '',
+          full_name: '',
+          role: 'user',
+          assigned_communities: [],
+          organization_slug: '',
+          access_token: ''
+        });
+        
+        // Reload users
+        await loadUsers();
+      } catch (error) {
+        alert('Failed to create Organization Admin: ' + (error as Error).message);
+      }
+      return;
+    }
+    
+    // Super Admin creating User or Community Lead - use register-user endpoint
+    if (currentUser?.role === 'super_admin' && (createUserForm.role === 'user' || createUserForm.role === 'community_lead')) {
+      if (!createUserForm.organization_slug) {
+        alert('❌ Organization Slug is required');
+        return;
+      }
+      
+      try {
+        const response = await fetch('http://localhost:8000/api/auth/register-user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            organization_slug: createUserForm.organization_slug,
+            username: createUserForm.username,
+            email: createUserForm.email,
+            password: createUserForm.password,
+            full_name: createUserForm.full_name,
+            role: createUserForm.role,
+            assigned_communities: createUserForm.assigned_communities
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.detail || 'Failed to create user');
+        }
+
+        const result = await response.json();
+        alert(`✅ ${createUserForm.role === 'user' ? 'User' : 'Community Lead'} created successfully!\n\nUsername: ${result.user.username}\nEmail: ${result.user.email}\nOrganization: ${result.user.organization?.name || 'N/A'}`);
+        
+        setShowCreateUserModal(false);
+        setCreateUserForm({
+          username: '',
+          email: '',
+          password: '',
+          confirm_password: '',
+          full_name: '',
+          role: 'user',
+          assigned_communities: [],
+          organization_slug: '',
+          access_token: ''
+        });
+        
+        // Reload users
+        await loadUsers();
+      } catch (error) {
+        alert('Failed to create user: ' + (error as Error).message);
+      }
+      return;
+    }
+    
+    // Org Admin creating User or Community Lead - use organization-specific endpoint
     try {
       const orgId = currentUser?.role === 'org_admin' 
         ? currentUser.organization?.id 
-        : organizations[0]?.id; // For super_admin, use first org or could add org selector
+        : null;
 
       if (!orgId) {
         alert('No organization available for user creation');
@@ -396,7 +505,9 @@ export default function AdminDashboard() {
         confirm_password: '',
         full_name: '',
         role: 'user',
-        assigned_communities: []
+        assigned_communities: [],
+        organization_slug: '',
+        access_token: ''
       });
       
       // Reload users
@@ -1308,13 +1419,71 @@ export default function AdminDashboard() {
                   <select
                     required
                     value={createUserForm.role}
-                    onChange={(e) => setCreateUserForm(prev => ({ ...prev, role: e.target.value, assigned_communities: [] }))}
+                    onChange={(e) => setCreateUserForm(prev => ({ 
+                      ...prev, 
+                      role: e.target.value, 
+                      assigned_communities: [],
+                      organization_slug: '',
+                      access_token: ''
+                    }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="user">User</option>
                     <option value="community_lead">Community Lead</option>
                     <option value="org_admin">Organization Admin</option>
                   </select>
+                </div>
+              )}
+              {currentUser?.role === 'super_admin' && createUserForm.role === 'org_admin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Organization Access Token *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={createUserForm.access_token}
+                    onChange={(e) => setCreateUserForm(prev => ({ ...prev, access_token: e.target.value }))}
+                    placeholder="Paste the organization access token"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    The access token that determines which organization this admin belongs to
+                  </p>
+                </div>
+              )}
+              {currentUser?.role === 'super_admin' && (createUserForm.role === 'user' || createUserForm.role === 'community_lead') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Organization Slug *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={createUserForm.organization_slug}
+                    onChange={(e) => setCreateUserForm(prev => ({ ...prev, organization_slug: e.target.value }))}
+                    placeholder="organization-slug"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    The slug (URL identifier) of the organization this user belongs to
+                  </p>
+                </div>
+              )}
+              {currentUser?.role === 'super_admin' && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-3 rounded">
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    {createUserForm.role === 'org_admin' && (
+                      <>
+                        <strong>📋 Organization Admin:</strong> Requires an <strong>access token</strong> to determine the organization.
+                      </>
+                    )}
+                    {(createUserForm.role === 'user' || createUserForm.role === 'community_lead') && (
+                      <>
+                        <strong>👥 {createUserForm.role === 'user' ? 'User' : 'Community Lead'}:</strong> Requires an <strong>organization slug</strong> to determine the organization.
+                      </>
+                    )}
+                  </p>
                 </div>
               )}
               {currentUser?.role === 'org_admin' && (
@@ -1374,11 +1543,13 @@ export default function AdminDashboard() {
                   </p>
                 </div>
               )}
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                <p className="text-xs text-gray-700 dark:text-gray-300">
-                  ℹ️ <strong>Note:</strong> The user will be created in {currentUser?.role === 'org_admin' ? 'your organization' : 'the first available organization'}.
-                </p>
-              </div>
+              {currentUser?.role === 'org_admin' && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                  <p className="text-xs text-gray-700 dark:text-gray-300">
+                    ℹ️ <strong>Note:</strong> The user will be created in your organization.
+                  </p>
+                </div>
+              )}
               <div className="flex gap-3 mt-6">
                 <button
                   type="button"
@@ -1391,7 +1562,9 @@ export default function AdminDashboard() {
                       confirm_password: '',
                       full_name: '',
                       role: 'user',
-                      assigned_communities: []
+                      assigned_communities: [],
+                      organization_slug: '',
+                      access_token: ''
                     });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
