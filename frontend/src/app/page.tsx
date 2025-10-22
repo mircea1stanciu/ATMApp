@@ -151,11 +151,11 @@ export default function HomePage() {
       scrollAccumulator = 0 // Immediately reset accumulator
       setActiveSection(sections[newIndex])
       
-      // Reset scrolling flag after animation
+      // Reset scrolling flag after animation - 1 second stop
       clearTimeout(scrollTimeout)
       scrollTimeout = setTimeout(() => {
         isScrolling = false
-      }, 700) // Wait for animation to complete
+      }, 1000) // Full 1 second stop to prevent skipping
     }
 
     // Add wheel event listener
@@ -201,7 +201,7 @@ export default function HomePage() {
           clearTimeout(scrollTimeout)
           scrollTimeout = setTimeout(() => {
             isScrolling = false
-          }, 700) // Match wheel handler timeout
+          }, 1000) // 1 second stop between sections
         }
       }
     }
@@ -237,7 +237,7 @@ export default function HomePage() {
         clearTimeout(scrollTimeout)
         scrollTimeout = setTimeout(() => {
           isScrolling = false
-        }, 700) // Match wheel handler timeout
+        }, 1000) // 1 second stop between sections
       }
     }
 
