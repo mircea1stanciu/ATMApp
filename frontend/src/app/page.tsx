@@ -102,8 +102,9 @@ export default function HomePage() {
     
     let isScrolling = false
     let scrollTimeout: NodeJS.Timeout
+    let resetTimeout: NodeJS.Timeout
     let scrollAccumulator = 0
-    const scrollThreshold = 35 // Lower threshold for better responsiveness
+    const scrollThreshold = 50 // Moderate threshold
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
@@ -112,6 +113,12 @@ export default function HomePage() {
       
       // Accumulate scroll delta
       scrollAccumulator += e.deltaY
+      
+      // Auto-reset accumulator if no scroll for a short time
+      clearTimeout(resetTimeout)
+      resetTimeout = setTimeout(() => {
+        scrollAccumulator = 0
+      }, 150) // Reset if user pauses scrolling
       
       // Only change section if threshold is exceeded
       if (Math.abs(scrollAccumulator) < scrollThreshold) {
@@ -122,33 +129,33 @@ export default function HomePage() {
       let newIndex = currentIndex
 
       if (scrollAccumulator > 0) {
-        // Scroll down - next section
-        newIndex = Math.min(currentIndex + 1, sections.length - 1)
-        if (newIndex !== currentIndex) {
-          setAnimationDirection('down')
+        // Scroll down - next section ONLY
+        newIndex = currentIndex + 1
+        if (newIndex >= sections.length) {
+          scrollAccumulator = 0
+          return
         }
+        setAnimationDirection('down')
       } else {
-        // Scroll up - previous section
-        newIndex = Math.max(currentIndex - 1, 0)
-        if (newIndex !== currentIndex) {
-          setAnimationDirection('up')
+        // Scroll up - previous section ONLY
+        newIndex = currentIndex - 1
+        if (newIndex < 0) {
+          scrollAccumulator = 0
+          return
         }
+        setAnimationDirection('up')
       }
 
-      if (newIndex !== currentIndex) {
-        isScrolling = true
-        scrollAccumulator = 0 // Reset accumulator
-        setActiveSection(sections[newIndex])
-        
-        // Reset scrolling flag after animation with shorter debounce
-        clearTimeout(scrollTimeout)
-        scrollTimeout = setTimeout(() => {
-          isScrolling = false
-        }, 650) // Faster response time
-      } else {
-        // Reset accumulator if we can't go further
-        scrollAccumulator = 0
-      }
+      // Change section and lock scrolling
+      isScrolling = true
+      scrollAccumulator = 0 // Immediately reset accumulator
+      setActiveSection(sections[newIndex])
+      
+      // Reset scrolling flag after animation
+      clearTimeout(scrollTimeout)
+      scrollTimeout = setTimeout(() => {
+        isScrolling = false
+      }, 700) // Wait for animation to complete
     }
 
     // Add wheel event listener
@@ -194,7 +201,7 @@ export default function HomePage() {
           clearTimeout(scrollTimeout)
           scrollTimeout = setTimeout(() => {
             isScrolling = false
-          }, 650) // Match wheel handler timeout
+          }, 700) // Match wheel handler timeout
         }
       }
     }
@@ -230,7 +237,7 @@ export default function HomePage() {
         clearTimeout(scrollTimeout)
         scrollTimeout = setTimeout(() => {
           isScrolling = false
-        }, 650) // Match wheel handler timeout
+        }, 700) // Match wheel handler timeout
       }
     }
 
@@ -245,6 +252,7 @@ export default function HomePage() {
       window.removeEventListener('touchend', handleTouchEnd)
       window.removeEventListener('keydown', handleKeyDown)
       clearTimeout(scrollTimeout)
+      clearTimeout(resetTimeout)
     }
   }, [activeSection, sections])
 
