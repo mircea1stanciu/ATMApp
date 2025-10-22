@@ -102,16 +102,26 @@ export default function HomePage() {
     
     let isScrolling = false
     let scrollTimeout: NodeJS.Timeout
+    let scrollAccumulator = 0
+    const scrollThreshold = 100 // Require more scroll distance before changing sections
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
       
       if (isScrolling) return
       
+      // Accumulate scroll delta
+      scrollAccumulator += e.deltaY
+      
+      // Only change section if threshold is exceeded
+      if (Math.abs(scrollAccumulator) < scrollThreshold) {
+        return
+      }
+      
       const currentIndex = sections.indexOf(activeSection)
       let newIndex = currentIndex
 
-      if (e.deltaY > 0) {
+      if (scrollAccumulator > 0) {
         // Scroll down - next section
         newIndex = Math.min(currentIndex + 1, sections.length - 1)
         if (newIndex !== currentIndex) {
@@ -127,13 +137,17 @@ export default function HomePage() {
 
       if (newIndex !== currentIndex) {
         isScrolling = true
+        scrollAccumulator = 0 // Reset accumulator
         setActiveSection(sections[newIndex])
         
-        // Reset scrolling flag after animation
+        // Reset scrolling flag after animation with longer debounce
         clearTimeout(scrollTimeout)
         scrollTimeout = setTimeout(() => {
           isScrolling = false
-        }, 600) // Match animation duration
+        }, 800) // Increased from 600ms for better control
+      } else {
+        // Reset accumulator if we can't go further
+        scrollAccumulator = 0
       }
     }
 
@@ -180,7 +194,7 @@ export default function HomePage() {
           clearTimeout(scrollTimeout)
           scrollTimeout = setTimeout(() => {
             isScrolling = false
-          }, 600)
+          }, 800) // Match wheel handler timeout
         }
       }
     }
@@ -216,7 +230,7 @@ export default function HomePage() {
         clearTimeout(scrollTimeout)
         scrollTimeout = setTimeout(() => {
           isScrolling = false
-        }, 600)
+        }, 800) // Match wheel handler timeout
       }
     }
 
