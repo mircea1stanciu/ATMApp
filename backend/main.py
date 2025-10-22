@@ -897,6 +897,52 @@ async def update_organization(
     return {"message": "Organization updated successfully", "id": org.id}
 
 
+@app.patch("/api/organizations/{org_id}/subscription", tags=["Organizations"])
+async def update_subscription_plan(
+    org_id: int,
+    plan_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_super_admin_user)
+):
+    """Update organization subscription plan (Super Admin only)"""
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Validate subscription plan
+    plan_name = plan_data.get("subscription_plan", "").upper()
+    if plan_name not in ["FREE", "BASIC", "PREMIUM", "ENTERPRISE"]:
+        raise HTTPException(status_code=400, detail="Invalid subscription plan")
+    
+    # Update subscription plan
+    old_plan = org.subscription_plan.value
+    org.subscription_plan = SubscriptionPlan[plan_name]
+    
+    # Auto-update limits based on plan
+    plan_limits = {
+        "FREE": {"max_users": 10, "max_chat_sessions": 1000},
+        "BASIC": {"max_users": 20, "max_chat_sessions": 5000},
+        "PREMIUM": {"max_users": 50, "max_chat_sessions": 25000},
+        "ENTERPRISE": {"max_users": 100, "max_chat_sessions": 50000}
+    }
+    
+    limits = plan_limits.get(plan_name, plan_limits["FREE"])
+    org.max_users = limits["max_users"]
+    org.max_chat_sessions = limits["max_chat_sessions"]
+    
+    db.commit()
+    db.refresh(org)
+    
+    return {
+        "message": "Subscription plan updated successfully",
+        "organization": org.name,
+        "old_plan": old_plan,
+        "new_plan": org.subscription_plan.value,
+        "max_users": org.max_users,
+        "max_chat_sessions": org.max_chat_sessions
+    }
+
+
 @app.delete("/api/organizations/{org_id}", tags=["Organizations"])
 async def delete_organization(
     org_id: int,

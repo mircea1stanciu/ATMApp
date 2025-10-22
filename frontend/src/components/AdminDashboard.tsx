@@ -49,6 +49,8 @@ export default function AdminDashboard() {
   const [showOrgDetailsModal, setShowOrgDetailsModal] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [orgStats, setOrgStats] = useState<any>(null);
+  const [showChangePlanModal, setShowChangePlanModal] = useState(false);
+  const [newPlan, setNewPlan] = useState('');
   const [createOrgForm, setCreateOrgForm] = useState({
     name: '',
     slug: '',
@@ -278,6 +280,32 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       alert('Failed to delete organization: ' + (error as Error).message);
+    }
+  };
+
+  const handleChangePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrg || !newPlan) return;
+
+    try {
+      const result = await apiCall(`/api/organizations/${selectedOrg.id}/subscription`, {
+        method: 'PATCH',
+        body: JSON.stringify({ subscription_plan: newPlan })
+      });
+
+      alert(`✅ Subscription plan updated successfully!\n\n${result.organization}\n${result.old_plan.toUpperCase()} → ${result.new_plan.toUpperCase()}\n\nNew Limits:\n• Max Users: ${result.max_users}\n• Max Chat Sessions: ${result.max_chat_sessions}`);
+      
+      setShowChangePlanModal(false);
+      setShowOrgDetailsModal(false);
+      setNewPlan('');
+      
+      // Reload data
+      await loadOrganizations();
+      if (activeSection === 'overview') {
+        await loadOverview();
+      }
+    } catch (error) {
+      alert('Failed to update subscription plan: ' + (error as Error).message);
     }
   };
 
@@ -657,9 +685,27 @@ export default function AdminDashboard() {
               {/* Plan and Status */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Subscription Plan</div>
-                  <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
-                    {orgStats.subscription_plan.toUpperCase()}
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">Subscription Plan</div>
+                  <div className="flex items-center justify-between">
+                    <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                      orgStats.subscription_plan === 'free' ? 'bg-gray-200 text-gray-800' :
+                      orgStats.subscription_plan === 'basic' ? 'bg-blue-100 text-blue-800' :
+                      orgStats.subscription_plan === 'premium' ? 'bg-purple-100 text-purple-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {orgStats.subscription_plan.toUpperCase()}
+                    </span>
+                    {currentUser?.role === 'super_admin' && (
+                      <button
+                        onClick={() => {
+                          setNewPlan(orgStats.subscription_plan);
+                          setShowChangePlanModal(true);
+                        }}
+                        className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Change Plan
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
@@ -840,6 +886,67 @@ export default function AdminDashboard() {
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Create Organization
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Change Subscription Plan Modal */}
+      {showChangePlanModal && selectedOrg && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full m-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Change Subscription Plan
+            </h3>
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                <strong>Organization:</strong> {selectedOrg.name}
+              </p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                <strong>Current Plan:</strong> {orgStats?.subscription_plan.toUpperCase()}
+              </p>
+            </div>
+            <form onSubmit={handleChangePlan} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  New Subscription Plan *
+                </label>
+                <select
+                  required
+                  value={newPlan}
+                  onChange={(e) => setNewPlan(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="">Select a plan...</option>
+                  <option value="free">FREE - 10 users, 1,000 chats/month</option>
+                  <option value="basic">BASIC - 20 users, 5,000 chats/month</option>
+                  <option value="premium">PREMIUM - 50 users, 25,000 chats/month</option>
+                  <option value="enterprise">ENTERPRISE - 100 users, 50,000 chats/month</option>
+                </select>
+              </div>
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+                <p className="text-xs text-gray-700 dark:text-gray-300">
+                  ⚠️ <strong>Note:</strong> Changing the subscription plan will automatically update the organization's user and chat session limits.
+                </p>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangePlanModal(false);
+                    setNewPlan('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Update Plan
                 </button>
               </div>
             </form>
