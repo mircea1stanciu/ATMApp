@@ -575,6 +575,24 @@ export default function AdminDashboard() {
                                   >
                                     📊 View
                                   </button>
+                                  {currentUser?.role === 'super_admin' && (
+                                    <button 
+                                      onClick={async () => {
+                                        try {
+                                          const stats = await apiCall(`/api/organizations/${org.id}/stats`);
+                                          setSelectedOrg(org);
+                                          setOrgStats(stats);
+                                          setNewPlan(org.subscription_plan);
+                                          setShowChangePlanModal(true);
+                                        } catch (error) {
+                                          alert('Failed to load organization details: ' + (error as Error).message);
+                                        }
+                                      }}
+                                      className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 transition-colors"
+                                    >
+                                      💳 Change Plan
+                                    </button>
+                                  )}
                                   {currentUser?.role === 'super_admin' && org.id !== 1 && (
                                     <button 
                                       onClick={() => handleDeleteOrg(org.id, org.name)}
