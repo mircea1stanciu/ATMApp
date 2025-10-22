@@ -385,9 +385,13 @@ export default function AdminDashboard() {
     }
     
     try {
-      const orgId = selectedUser.organization?.id;
+      // Get organization ID from current user context
+      const orgId = currentUser?.role === 'org_admin' 
+        ? currentUser.organization?.id 
+        : organizations[0]?.id; // For super_admin, use first org
+      
       if (!orgId) {
-        alert('User organization not found');
+        alert('❌ No organization context available. Please reload the page.');
         return;
       }
 
