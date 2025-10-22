@@ -718,7 +718,15 @@ export default function AdminDashboard() {
                   type="text"
                   required
                   value={createOrgForm.name}
-                  onChange={(e) => setCreateOrgForm(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    // Auto-generate slug from name
+                    const slug = name
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]+/g, '-')
+                      .replace(/^-|-$/g, '');
+                    setCreateOrgForm(prev => ({ ...prev, name, slug }));
+                  }}
                   placeholder="Acme Corporation"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
@@ -726,6 +734,7 @@ export default function AdminDashboard() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Slug (URL-friendly) *
+                  <span className="text-xs text-gray-500 ml-2">(auto-generated from name)</span>
                 </label>
                 <input
                   type="text"
@@ -735,6 +744,9 @@ export default function AdminDashboard() {
                   placeholder="acme-corp"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Example: "{createOrgForm.slug || 'acme-corp'}"
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
