@@ -144,7 +144,7 @@ export default function HomePage() {
         clearTimeout(scrollTimeout)
         scrollTimeout = setTimeout(() => {
           isScrolling = false
-        }, 800) // Increased from 600ms for better control
+        }, 600) // Reduced for better button responsiveness
       } else {
         // Reset accumulator if we can't go further
         scrollAccumulator = 0
@@ -194,7 +194,7 @@ export default function HomePage() {
           clearTimeout(scrollTimeout)
           scrollTimeout = setTimeout(() => {
             isScrolling = false
-          }, 800) // Match wheel handler timeout
+          }, 600) // Match wheel handler timeout
         }
       }
     }
@@ -230,7 +230,7 @@ export default function HomePage() {
         clearTimeout(scrollTimeout)
         scrollTimeout = setTimeout(() => {
           isScrolling = false
-        }, 800) // Match wheel handler timeout
+        }, 600) // Match wheel handler timeout
       }
     }
 
