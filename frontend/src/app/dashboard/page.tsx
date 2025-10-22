@@ -140,7 +140,7 @@ export default function UserDashboard() {
             {communities.map((community) => (
               <Link
                 key={community.id}
-                href={`/community/${community.id}/qa`}
+                href={`/community/${community.id}`}
                 className="group bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-200 border-2 border-transparent hover:border-blue-500"
               >
                 <div className="flex items-center justify-between mb-4">
