@@ -370,8 +370,21 @@ export default function CommunityPage() {
   // Listen for request to open chat
   useEffect(() => {
     const handler = () => setIsChatOpen(true);
+    const chatWithQueryHandler = (e: any) => {
+      if (e.detail?.query) {
+        setIsChatOpen(true);
+      }
+    };
+    
     window.addEventListener('requestOpenChat', handler);
-    return () => window.removeEventListener('requestOpenChat', handler);
+    window.addEventListener('openCommunityChatFromProject', handler);
+    window.addEventListener('openCommunityChatWithQuery', chatWithQueryHandler);
+    
+    return () => {
+      window.removeEventListener('requestOpenChat', handler);
+      window.removeEventListener('openCommunityChatFromProject', handler);
+      window.removeEventListener('openCommunityChatWithQuery', chatWithQueryHandler);
+    };
   }, []);
   
   if (!community) {

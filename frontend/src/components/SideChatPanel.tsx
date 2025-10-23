@@ -78,8 +78,21 @@ export default function SideChatPanel({
         setTimeout(() => textareaRef.current?.focus(), 100);
       }
     };
+    
+    const deliveryFlowHandler = (e: any) => {
+      if (e.detail?.query) {
+        setInputValue(e.detail.query);
+        // Auto-focus the input
+        setTimeout(() => textareaRef.current?.focus(), 100);
+      }
+    };
+    
     window.addEventListener('openChatWithQuery', handler);
-    return () => window.removeEventListener('openChatWithQuery', handler);
+    window.addEventListener('openCommunityChatWithQuery', deliveryFlowHandler);
+    return () => {
+      window.removeEventListener('openChatWithQuery', handler);
+      window.removeEventListener('openCommunityChatWithQuery', deliveryFlowHandler);
+    };
   }, [isOpen]);
 
   const formatMessage = (content: string) => {
