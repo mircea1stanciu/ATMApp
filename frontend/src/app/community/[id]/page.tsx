@@ -334,7 +334,8 @@ export default function CommunityPage() {
   const communityId = params.id as string
   const [hasAccess, setHasAccess] = useState<boolean | null>(null)
   const [user, setUser] = useState<any>(null)
-  const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'projects'>('dashboard')
+  const [activeView, setActiveView] = useState<'dashboard' | 'projects'>('dashboard')
+  const [isChatOpen, setIsChatOpen] = useState(false)
   
   const community = communityData[communityId as keyof typeof communityData]
   
@@ -368,7 +369,7 @@ export default function CommunityPage() {
 
   // Listen for request to open chat
   useEffect(() => {
-    const handler = () => setActiveView('chat');
+    const handler = () => setIsChatOpen(true);
     window.addEventListener('requestOpenChat', handler);
     return () => window.removeEventListener('requestOpenChat', handler);
   }, []);
@@ -432,18 +433,6 @@ export default function CommunityPage() {
         </div>
 
         <nav className="flex-1">
-          <button
-            onClick={() => setActiveView('chat')}
-            className={`w-full flex items-center gap-3 px-6 py-3 text-left transition-colors ${
-              activeView === 'chat'
-                ? 'bg-blue-600 border-r-3 border-white' 
-                : 'hover:bg-gray-800'
-            }`}
-          >
-            <span className="text-lg">💬</span>
-            <span>AI Assistant</span>
-          </button>
-          
           <button
             onClick={() => setActiveView('dashboard')}
             className={`w-full flex items-center gap-3 px-6 py-3 text-left transition-colors ${
@@ -521,17 +510,19 @@ export default function CommunityPage() {
                   {community.name}
                 </h1>
                 <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400">
-                  {activeView === 'chat' ? 'AI Assistant' : activeView === 'projects' ? 'Projects' : 'Dashboard'}
+                  {activeView === 'projects' ? 'Projects' : 'Dashboard'}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Mobile Menu Toggle */}
+              {/* AI Assistant Button */}
               <button
-                onClick={() => setActiveView(activeView === 'chat' ? 'dashboard' : 'chat')}
-                className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                onClick={() => setIsChatOpen(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                title="Open AI Assistant"
               >
-                <span className="text-xl">{activeView === 'chat' ? '📊' : '💬'}</span>
+                <span>💬</span>
+                <span className="hidden sm:inline">AI Assistant</span>
               </button>
               <span className="hidden sm:inline text-xs sm:text-sm text-gray-900 dark:text-white font-medium">
                 {user?.full_name || user?.username}
@@ -554,7 +545,7 @@ export default function CommunityPage() {
         {/* Content Area */}
         <div className="flex-1 flex overflow-auto relative">
           {/* Main Content Area */}
-          <div className={`flex-1 ${activeView === 'chat' ? 'hidden lg:block' : 'block'}`}>
+          <div className="flex-1">
             {activeView === 'dashboard' && (
               <CommunityDashboard
                 communityId={communityId}
@@ -571,35 +562,60 @@ export default function CommunityPage() {
               />
             )}
           </div>
-
-          {/* Side Chat Panel */}
-          <div className={`${activeView === 'chat' ? 'flex-1 lg:flex-initial' : 'hidden'}`}>
-            <SideChatPanel
-              communityId={communityId}
-              communityName={community.name}
-              communityIcon={community.icon}
-              communityColor={community.color}
-              capabilities={community.capabilities}
-              examples={community.examples}
-              isOpen={activeView === 'chat'}
-              onClose={() => setActiveView('dashboard')}
-            />
-          </div>
-
-          {/* Floating Chat Toggle Button (Mobile Only) */}
-          {activeView !== 'chat' && (
-            <button
-              onClick={() => setActiveView('chat')}
-              className="lg:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-30"
-              title="Open AI Assistant"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
-            </button>
-          )}
         </div>
+
+        {/* Floating Chat Pop-up */}
+        {isChatOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col">
+              {/* Chat Header */}
+              <div className={`${community.color} text-white p-4 rounded-t-xl flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{community.icon}</span>
+                  <div>
+                    <h3 className="font-semibold text-lg">{community.name} - AI Assistant</h3>
+                    <p className="text-sm text-white/80">Ask me anything about {community.name.toLowerCase()}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsChatOpen(false)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                  title="Close chat"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Chat Content */}
+              <div className="flex-1 overflow-hidden">
+                <SideChatPanel
+                  communityId={communityId}
+                  communityName={community.name}
+                  communityIcon={community.icon}
+                  communityColor={community.color}
+                  capabilities={community.capabilities}
+                  examples={community.examples}
+                  isOpen={isChatOpen}
+                  onClose={() => setIsChatOpen(false)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Chat Button */}
+        <button
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-40"
+          title="Open AI Assistant"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+        </button>
       </div>
     </div>
   )
