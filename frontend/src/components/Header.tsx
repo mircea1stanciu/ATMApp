@@ -231,6 +231,18 @@ export default function Header({ currentCommunity, onClear, onShowExamples, onLo
                   </Link>
                 )}
 
+                {userRole === 'community_lead' && (
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 rounded-lg shadow-sm transition-all duration-200"
+                    title="Community Lead Dashboard"
+                  >
+                    <User size={16} />
+                    <span className="hidden sm:inline">My Dashboard</span>
+                    <span className="sm:hidden">Dashboard</span>
+                  </Link>
+                )}
+
                 {userRole === 'user' && (
                   <Link
                     href="/dashboard"
