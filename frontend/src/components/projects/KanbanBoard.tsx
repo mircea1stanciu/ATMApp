@@ -76,7 +76,9 @@ export default function KanbanBoard({ projectId, onIssueClick, onCreateIssue }: 
           done: [],
         };
 
-        data.forEach((issue: Issue) => {
+        // Backend returns {issues: [...]} not just [...]
+        const issuesList = data.issues || data;
+        issuesList.forEach((issue: Issue) => {
           if (grouped[issue.status]) {
             grouped[issue.status].push(issue);
           }
