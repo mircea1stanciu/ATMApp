@@ -668,6 +668,13 @@ export default function AdminDashboard() {
           
           <div className="mt-8 px-6">
             <button
+              onClick={() => router.push('/settings')}
+              className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
+            >
+              <span className="text-lg">⚙️</span>
+              <span>Settings</span>
+            </button>
+            <button
               onClick={() => router.push('/')}
               className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
             >
