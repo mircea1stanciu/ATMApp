@@ -423,9 +423,9 @@ export default function CommunityPage() {
   }
 
   return (
-    <div className="h-screen flex bg-gray-900">
+    <div className="min-h-screen flex bg-gray-900">
       {/* Sidebar Navigation */}
-      <div className="w-64 bg-gray-900 text-white flex flex-col border-r border-gray-700 hidden lg:flex">
+      <div className="w-64 bg-gray-900 text-white flex flex-col border-r border-gray-700 hidden lg:flex sticky top-0 h-screen">
         <div className="p-6">
           <h1 className="text-2xl font-bold text-white mb-1">UnifiedWork</h1>
           <p className="text-sm text-gray-400">{community.name}</p>
@@ -508,9 +508,9 @@ export default function CommunityPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-screen">
         {/* Header */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 md:px-6 py-2 sm:py-3">
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 md:px-6 py-2 sm:py-3 sticky top-0 z-20">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${community.color} text-white`}>
@@ -552,7 +552,7 @@ export default function CommunityPage() {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 flex overflow-hidden relative">
+        <div className="flex-1 flex overflow-auto relative">
           {/* Main Content Area */}
           <div className={`flex-1 ${activeView === 'chat' ? 'hidden lg:block' : 'block'}`}>
             {activeView === 'dashboard' && (
