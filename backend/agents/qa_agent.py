@@ -25,11 +25,12 @@ from tools.qa_tools import (
 class QAAgent:
     """AI Agent specialized for QA Engineers"""
     
-    def __init__(self):
-        """Initialize the QA Agent"""
+    def __init__(self, model_id: str = None):
+        """Initialize the QA Agent with optional model selection"""
         self.conversation_history: List[Dict[str, str]] = []
         self.community = "qa"
         self.agent_name = "QualityGPT"
+        self.model_id = model_id
         
         # Initialize LLM
         self.llm = self._initialize_llm()
@@ -49,7 +50,17 @@ class QAAgent:
         self.agent_executor = self._create_agent()
     
     def _initialize_llm(self):
-        """Initialize Language Model"""
+        """Initialize Language Model with model selection support"""
+        if self.model_id:
+            # Use model manager for dynamic model selection
+            from core.model_manager import ModelManager
+            try:
+                return ModelManager.create_llm(self.model_id)
+            except Exception as e:
+                print(f"Failed to create LLM with model {self.model_id}: {e}")
+                # Fall back to default
+        
+        # Default behavior
         if os.getenv("OPENAI_API_KEY"):
             return ChatOpenAI(
                 model=os.getenv("DEFAULT_MODEL", "gpt-4o-mini"),

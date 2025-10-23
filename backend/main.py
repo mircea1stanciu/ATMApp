@@ -555,6 +555,99 @@ async def community_chat(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
 
+# AI Model Management Endpoints (GitHub Copilot-style)
+@app.get("/api/ai-models", tags=["AI Models"])
+async def get_available_models(current_user: User = Depends(get_current_user)):
+    """Get list of available AI models"""
+    from core.model_manager import ModelManager
+    
+    # Get user's subscription plan
+    subscription = "free"
+    if current_user.organization_id:
+        org = await get_db().query(Organization).filter(Organization.id == current_user.organization_id).first()
+        if org:
+            subscription = org.subscription_plan.value
+    
+    models = ModelManager.get_available_models()
+    
+    # Filter models based on subscription
+    accessible_models = [
+        model for model in models
+        if ModelManager.validate_model_access(model["id"], subscription)
+    ]
+    
+    return {
+        "models": accessible_models,
+        "default": ModelManager.DEFAULT_MODEL,
+        "user_preference": current_user.preferred_ai_model or ModelManager.DEFAULT_MODEL,
+        "subscription": subscription
+    }
+
+@app.get("/api/ai-models/{model_id}", tags=["AI Models"])
+async def get_model_info(model_id: str, current_user: User = Depends(get_current_user)):
+    """Get detailed information about a specific model"""
+    from core.model_manager import ModelManager
+    
+    model_info = ModelManager.get_model_info(model_id)
+    if not model_info:
+        raise HTTPException(status_code=404, detail="Model not found")
+    
+    return model_info
+
+@app.post("/api/user/preferences/model", tags=["User Preferences"])
+async def set_preferred_model(
+    model_id: str,
+    temperature: Optional[float] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Set user's preferred AI model"""
+    from core.model_manager import ModelManager
+    
+    # Validate model exists
+    if model_id not in ModelManager.AVAILABLE_MODELS:
+        raise HTTPException(status_code=400, detail="Invalid model ID")
+    
+    # Check subscription access
+    subscription = "free"
+    if current_user.organization_id:
+        org = db.query(Organization).filter(Organization.id == current_user.organization_id).first()
+        if org:
+            subscription = org.subscription_plan.value
+    
+    if not ModelManager.validate_model_access(model_id, subscription):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Model '{model_id}' not available in {subscription} plan. Upgrade to access."
+        )
+    
+    # Update user preferences
+    current_user.preferred_ai_model = model_id
+    if temperature is not None:
+        if not 0.0 <= temperature <= 1.0:
+            raise HTTPException(status_code=400, detail="Temperature must be between 0.0 and 1.0")
+        current_user.ai_temperature = str(temperature)
+    
+    db.commit()
+    
+    return {
+        "message": "Preferences updated successfully",
+        "preferred_model": model_id,
+        "temperature": float(current_user.ai_temperature),
+        "model_info": ModelManager.get_model_info(model_id)
+    }
+
+@app.get("/api/user/preferences", tags=["User Preferences"])
+async def get_user_preferences(
+    current_user: User = Depends(get_current_user)
+):
+    """Get user's AI preferences"""
+    return {
+        "preferred_model": current_user.preferred_ai_model or "gpt-4o-mini",
+        "temperature": float(current_user.ai_temperature) if current_user.ai_temperature else 0.7,
+        "theme": current_user.theme_preference or "system"
+    }
+
 # Get community examples
 @app.get("/api/communities/{community_id}/examples", tags=["Communities"])
 async def get_community_examples(community_id: str):

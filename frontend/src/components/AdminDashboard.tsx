@@ -1861,7 +1861,7 @@ export default function AdminDashboard() {
                       { id: 'product', name: 'Product Managers', icon: '📊' },
                       { id: 'devops', name: 'DevOps Engineers', icon: '🔐' },
                       { id: 'analyst', name: 'Business System Analysts', icon: '�' }
-                    ].map((community) => (
+                    ].map(community => (
                       <label key={community.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded">
                         <input
                           type="checkbox"
@@ -2020,7 +2020,7 @@ export default function AdminDashboard() {
                       { id: 'product', name: 'Product Managers', icon: '📊' },
                       { id: 'devops', name: 'DevOps Engineers', icon: '🔐' },
                       { id: 'analyst', name: 'Business System Analysts', icon: '�' }
-                    ].map((community) => (
+                    ].map(community => (
                       <label key={community.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded">
                         <input
                           type="checkbox"

@@ -124,6 +124,8 @@ class User(Base):
     # User preferences
     preferred_communities = Column(String, nullable=True)  # JSON string of community preferences
     theme_preference = Column(String, default="system")  # light, dark, system
+    preferred_ai_model = Column(String, default="gpt-4o-mini")  # User's preferred AI model
+    ai_temperature = Column(String, default="0.7")  # AI creativity level (0.0-1.0)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -166,6 +168,7 @@ class ChatSession(Base):
     # Chat content
     message = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
+    model_used = Column(String, default="gpt-4o-mini")  # Which AI model was used
     
     # Metadata
     response_time_ms = Column(Integer, nullable=True)  # Response time in milliseconds
