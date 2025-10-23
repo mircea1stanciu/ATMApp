@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 import os
+import json
 from dotenv import load_dotenv
 
 # Import core modules
@@ -31,6 +32,7 @@ from agents.design_agent import DesignAgent
 from agents.product_agent import ProductAgent
 from agents.devops_agent import DevOpsAgent
 from agents.docs_agent import DocsAgent
+from api import project_routes
 
 # Load environment variables
 load_dotenv()
@@ -51,7 +53,7 @@ A comprehensive platform that brings together all tech roles with specialized AI
 4. **✨ UI/UX Designers** → DesignGPT - Design systems, accessibility
 5. **📊 Product Managers** → ProductGPT - Requirements, user stories
 6. **🔐 DevOps Engineers** → OpsGPT - CI/CD, infrastructure
-7. **📝 Technical Writers** → DocsGPT - Documentation, tutorials
+7. **� Business System Analysts** → AnalystGPT - Requirements analysis, process optimization
 
 ### Features
 
@@ -90,6 +92,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(project_routes.router)
+
+# Global agent instances - One for each community
 # Global agent instances - One for each community
 agents = {
     "qa": None,
@@ -98,7 +104,7 @@ agents = {
     "design": None,
     "product": None,
     "devops": None,
-    "docs": None
+    "analyst": None,  # Changed from "docs" to "analyst"
 }
 
 @app.on_event("startup")
@@ -121,7 +127,7 @@ async def startup_event():
         agents["design"] = DesignAgent()
         agents["product"] = ProductAgent()
         agents["devops"] = DevOpsAgent()
-        agents["docs"] = DocsAgent()
+        agents["analyst"] = DocsAgent()  # Renamed to analyst, using DocsAgent for now
         print("✅ All AI Agents initialized successfully")
     except Exception as e:
         print(f"❌ Failed to initialize agents: {e}")
@@ -206,6 +212,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role.value,
+            "assigned_communities": json.loads(user.assigned_communities) if user.assigned_communities else [],
             "organization": org_info
         }
     )
@@ -231,6 +238,7 @@ async def get_current_user_info(current_user: User = Depends(get_current_user), 
         "email": current_user.email,
         "full_name": current_user.full_name,
         "role": current_user.role.value,
+        "assigned_communities": json.loads(current_user.assigned_communities) if current_user.assigned_communities else [],
         "organization": org_info
     }
 
@@ -535,7 +543,7 @@ async def community_chat(
             "design": "DesignGPT",
             "product": "ProductGPT",
             "devops": "OpsGPT",
-            "docs": "DocsGPT"
+            "analyst": "AnalystGPT"  # Changed from "docs": "DocsGPT"
         }
         
         return ChatResponse(
@@ -679,23 +687,23 @@ async def get_community_examples(community_id: str):
                 }
             ]
         },
-        "docs": {
-            "agent": "DocsGPT",
+        "analyst": {
+            "agent": "AnalystGPT",
             "examples": [
                 {
-                    "category": "API Documentation",
+                    "category": "Requirements Analysis",
                     "queries": [
-                        "Write comprehensive API documentation for REST endpoints",
-                        "Create developer onboarding guide",
-                        "Document GraphQL schema with examples"
+                        "Analyze business requirements for CRM system",
+                        "Create functional specification document",
+                        "Define user stories with acceptance criteria"
                     ]
                 },
                 {
-                    "category": "User Guides",
+                    "category": "Process Optimization",
                     "queries": [
-                        "Create step-by-step tutorial for beginners",
-                        "Write troubleshooting guide for common issues",
-                        "Design documentation site structure"
+                        "Map current business process workflow",
+                        "Identify bottlenecks in sales process",
+                        "Design improved customer onboarding flow"
                     ]
                 }
             ]
@@ -996,13 +1004,14 @@ async def list_organization_users(
     
     users = db.query(User).filter(User.organization_id == org_id).all()
     
+    import json
     return [{
         "id": user.id,
         "username": user.username,
         "email": user.email,
         "full_name": user.full_name,
         "role": user.role.value,
-        "assigned_communities": user.assigned_communities,
+        "assigned_communities": json.loads(user.assigned_communities) if user.assigned_communities else [],
         "is_active": user.is_active,
         "created_at": user.created_at.isoformat(),
         "last_login": user.last_login.isoformat() if user.last_login else None
@@ -1091,6 +1100,7 @@ async def create_organization_user(
     db.commit()
     db.refresh(new_user)
     
+    import json
     return {
         "message": "User created successfully",
         "user": {
@@ -1099,7 +1109,7 @@ async def create_organization_user(
             "email": new_user.email,
             "full_name": new_user.full_name,
             "role": new_user.role.value,
-            "assigned_communities": new_user.assigned_communities,
+            "assigned_communities": json.loads(new_user.assigned_communities) if new_user.assigned_communities else [],
             "organization_id": new_user.organization_id,
             "is_active": new_user.is_active
         }
@@ -1156,6 +1166,7 @@ async def update_organization_user(
     db.commit()
     db.refresh(user)
     
+    import json
     return {
         "message": "User updated successfully",
         "user": {
@@ -1164,7 +1175,7 @@ async def update_organization_user(
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role.value,
-            "assigned_communities": user.assigned_communities,
+            "assigned_communities": json.loads(user.assigned_communities) if user.assigned_communities else [],
             "organization_id": user.organization_id,
             "is_active": user.is_active
         }

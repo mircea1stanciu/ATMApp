@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import { notFound } from 'next/navigation'
 import Header from '../../../components/Header'
-import EnhancedChatInterface from '../../../components/EnhancedChatInterface'
+import CommunityDashboard from '../../../components/CommunityDashboard'
+import SideChatPanel from '../../../components/SideChatPanel'
+import ProjectsPage from '../../../components/projects/ProjectsPage'
 
 const communityData = {
   qa: {
@@ -280,18 +282,18 @@ const communityData = {
     ],
     placeholder: 'Ask me about CI/CD, infrastructure, monitoring, security...'
   },
-  docs: {
-    name: 'Technical Writers',
-    icon: '📝',
-    agent: 'DocsGPT',
+  analyst: {
+    name: 'Business System Analysts',
+    icon: '�',
+    agent: 'AnalystGPT',
     color: 'bg-indigo-500',
     capabilities: [
-      { icon: '📚', title: 'Documentation', description: 'Technical guides' },
-      { icon: '📖', title: 'API Docs', description: 'Developer resources' },
-      { icon: '🎓', title: 'Tutorials', description: 'Step-by-step guides' },
-      { icon: '📝', title: 'Content Strategy', description: 'Information architecture' },
-      { icon: '🔍', title: 'Content Audit', description: 'Quality assurance' },
-      { icon: '👥', title: 'User Guides', description: 'End-user documentation' }
+      { icon: '�', title: 'Requirements Analysis', description: 'Business requirements' },
+      { icon: '�', title: 'Process Mapping', description: 'Workflow documentation' },
+      { icon: '�', title: 'User Stories', description: 'Acceptance criteria' },
+      { icon: '�', title: 'Process Optimization', description: 'Efficiency improvements' },
+      { icon: '🔍', title: 'Gap Analysis', description: 'System evaluation' },
+      { icon: '�', title: 'Business Cases', description: 'ROI analysis' }
     ],
     examples: [
       {
@@ -328,30 +330,277 @@ const communityData = {
 
 export default function CommunityPage() {
   const params = useParams()
+  const router = useRouter()
   const communityId = params.id as string
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null)
+  const [user, setUser] = useState<any>(null)
+  const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'projects'>('dashboard')
   
   const community = communityData[communityId as keyof typeof communityData]
+  
+  useEffect(() => {
+    // Check if user has access to this community
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const userData = JSON.parse(userStr);
+      setUser(userData);
+      
+      // Super admins and org admins have access to all communities
+      if (userData.role === 'super_admin' || userData.role === 'org_admin') {
+        setHasAccess(true);
+        return;
+      }
+      
+      // Regular users and community leads need to have the community assigned
+      const assignedCommunities = userData.assigned_communities || [];
+      const hasAccessToCommunity = assignedCommunities.includes(communityId);
+      setHasAccess(hasAccessToCommunity);
+      
+    } catch (e) {
+      router.push('/login');
+    }
+  }, [communityId, router]);
+
+  // Listen for request to open chat
+  useEffect(() => {
+    const handler = () => setActiveView('chat');
+    window.addEventListener('requestOpenChat', handler);
+    return () => window.removeEventListener('requestOpenChat', handler);
+  }, []);
   
   if (!community) {
     notFound()
   }
 
+  // Show loading state while checking access
+  if (hasAccess === null) {
+    return (
+      <div className="h-screen flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied message
+  if (!hasAccess) {
+    return (
+      <div className="h-screen flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 sm:p-8">
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
+                <span className="text-3xl">🔒</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                Access Denied
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                You don't have access to the <strong>{community.name}</strong> community.
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
+                Please contact your organization administrator to request access to this community.
+              </p>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-screen flex flex-col">
-      <Header 
-        currentCommunity={communityId}
-        onClear={() => {/* Handled by EnhancedChatInterface */}}
-        onShowExamples={() => {/* Handled by EnhancedChatInterface */}}
-      />
-      
-      <EnhancedChatInterface
-        communityId={communityId}
-        communityName={community.name}
-        communityIcon={community.icon}
-        communityColor={community.color}
-        capabilities={community.capabilities}
-        examples={community.examples}
-      />
+    <div className="h-screen flex bg-gray-900">
+      {/* Sidebar Navigation */}
+      <div className="w-64 bg-gray-900 text-white flex flex-col border-r border-gray-700 hidden lg:flex">
+        <div className="p-6">
+          <h1 className="text-2xl font-bold text-white mb-1">UnifiedWork</h1>
+          <p className="text-sm text-gray-400">{community.name}</p>
+        </div>
+
+        <nav className="flex-1">
+          <button
+            onClick={() => setActiveView('chat')}
+            className={`w-full flex items-center gap-3 px-6 py-3 text-left transition-colors ${
+              activeView === 'chat'
+                ? 'bg-blue-600 border-r-3 border-white' 
+                : 'hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-lg">💬</span>
+            <span>AI Assistant</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveView('dashboard')}
+            className={`w-full flex items-center gap-3 px-6 py-3 text-left transition-colors ${
+              activeView === 'dashboard'
+                ? 'bg-blue-600 border-r-3 border-white' 
+                : 'hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-lg">📊</span>
+            <span>Dashboard</span>
+          </button>
+
+          <button
+            onClick={() => setActiveView('projects')}
+            className={`w-full flex items-center gap-3 px-6 py-3 text-left transition-colors ${
+              activeView === 'projects'
+                ? 'bg-blue-600 border-r-3 border-white' 
+                : 'hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-lg">📋</span>
+            <span>Projects</span>
+          </button>
+
+          <div className="mt-8 px-6">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
+            >
+              <span className="text-lg">🏠</span>
+              <span>All Communities</span>
+            </button>
+            <button
+              onClick={() => {
+                if (user?.role === 'super_admin' || user?.role === 'org_admin') {
+                  window.open('/admin', '_blank');
+                }
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-2 rounded transition-colors ${
+                user?.role === 'super_admin' || user?.role === 'org_admin'
+                  ? 'text-gray-300 hover:text-white hover:bg-gray-800'
+                  : 'text-gray-600 cursor-not-allowed'
+              }`}
+              disabled={user?.role !== 'super_admin' && user?.role !== 'org_admin'}
+            >
+              <span className="text-lg">⚙️</span>
+              <span>Admin Panel</span>
+            </button>
+            <button
+              onClick={() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                router.push('/login');
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
+            >
+              <span className="text-lg">🚪</span>
+              <span>Logout</span>
+            </button>
+          </div>
+        </nav>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 md:px-6 py-2 sm:py-3">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${community.color} text-white`}>
+                {community.icon}
+              </div>
+              <div>
+                <h1 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white">
+                  {community.name}
+                </h1>
+                <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                  {activeView === 'chat' ? 'AI Assistant' : activeView === 'projects' ? 'Projects' : 'Dashboard'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Mobile Menu Toggle */}
+              <button
+                onClick={() => setActiveView(activeView === 'chat' ? 'dashboard' : 'chat')}
+                className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                <span className="text-xl">{activeView === 'chat' ? '📊' : '💬'}</span>
+              </button>
+              <span className="hidden sm:inline text-xs sm:text-sm text-gray-900 dark:text-white font-medium">
+                {user?.full_name || user?.username}
+              </span>
+              <span className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-medium ${
+                user?.role === 'super_admin' 
+                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                  : user?.role === 'org_admin'
+                  ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                  : user?.role === 'community_lead'
+                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                  : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+              }`}>
+                {user?.role?.replace('_', ' ').toUpperCase() || 'USER'}
+              </span>
+            </div>
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Main Content Area */}
+          <div className={`flex-1 ${activeView === 'chat' ? 'hidden lg:block' : 'block'}`}>
+            {activeView === 'dashboard' && (
+              <CommunityDashboard
+                communityId={communityId}
+                communityName={community.name}
+                communityIcon={community.icon}
+                communityColor={community.color}
+                capabilities={community.capabilities}
+              />
+            )}
+            {activeView === 'projects' && (
+              <ProjectsPage
+                communityId={communityId}
+                communityName={community.name}
+              />
+            )}
+          </div>
+
+          {/* Side Chat Panel */}
+          <div className={`${activeView === 'chat' ? 'flex-1 lg:flex-initial' : 'hidden'}`}>
+            <SideChatPanel
+              communityId={communityId}
+              communityName={community.name}
+              communityIcon={community.icon}
+              communityColor={community.color}
+              capabilities={community.capabilities}
+              examples={community.examples}
+              isOpen={activeView === 'chat'}
+              onClose={() => setActiveView('dashboard')}
+            />
+          </div>
+
+          {/* Floating Chat Toggle Button (Mobile Only) */}
+          {activeView !== 'chat' && (
+            <button
+              onClick={() => setActiveView('chat')}
+              className="lg:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-30"
+              title="Open AI Assistant"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

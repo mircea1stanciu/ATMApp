@@ -183,7 +183,7 @@ export default function RegisterForm() {
                   📋 Organization Admin Registration
                 </h4>
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  Use the access token provided by the super admin to register as the first administrator for your organization.
+                  Use the access token provided by the UnifiedWork Admin to register as the first administrator for your organization.
                 </p>
               </div>
 

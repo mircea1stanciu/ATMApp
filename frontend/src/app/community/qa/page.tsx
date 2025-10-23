@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Header from '../../../components/Header'
 import Sidebar from '../../../components/Sidebar'
 import ChatInterface from '../../../components/ChatInterface'
@@ -58,7 +59,83 @@ const quickTips = [
 ]
 
 export default function QACommunityPage() {
+  const router = useRouter()
   const [showExamples, setShowExamples] = useState(false)
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null)
+  const [user, setUser] = useState<any>(null)
+
+  useEffect(() => {
+    // Check if user has access to QA community
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const userData = JSON.parse(userStr);
+      setUser(userData);
+      
+      // Super admins and org admins have access to all communities
+      if (userData.role === 'super_admin' || userData.role === 'org_admin') {
+        setHasAccess(true);
+        return;
+      }
+      
+      // Regular users and community leads need to have 'qa' community assigned
+      const assignedCommunities = userData.assigned_communities || [];
+      const hasAccessToCommunity = assignedCommunities.includes('qa');
+      setHasAccess(hasAccessToCommunity);
+      
+    } catch (e) {
+      router.push('/login');
+    }
+  }, [router]);
+
+  // Show loading state while checking access
+  if (hasAccess === null) {
+    return (
+      <div className="h-screen flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied message
+  if (!hasAccess) {
+    return (
+      <div className="h-screen flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 sm:p-8">
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
+                <span className="text-3xl">🔒</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                Access Denied
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                You don't have access to the <strong>QA Engineers</strong> community.
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
+                Please contact your organization administrator to request access to this community.
+              </p>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const welcomeContent = (
     <div className="text-center py-8">

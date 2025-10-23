@@ -649,7 +649,8 @@ export default function AdminDashboard() {
           {[
             { id: 'overview', icon: '📊', label: 'Overview', roles: ['super_admin', 'org_admin'] },
             { id: 'organizations', icon: '🏢', label: 'Organizations', roles: ['super_admin'] },
-            { id: 'users', icon: '👥', label: 'Users', roles: ['super_admin', 'org_admin'] }
+            { id: 'users', icon: '👥', label: 'Users', roles: ['super_admin', 'org_admin'] },
+            { id: 'api-docs', icon: '📚', label: 'API Documentation', roles: ['super_admin'] }
           ].filter(item => item.roles.includes(currentUser?.role || '')).map((item) => (
             <button
               key={item.id}
@@ -687,23 +688,31 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 md:px-6 py-2 sm:py-3">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white">
                 {activeSection === 'overview' && 'Dashboard Overview'}
                 {activeSection === 'organizations' && 'Organizations Management'}
                 {activeSection === 'users' && (currentUser?.role === 'org_admin' ? 'Organization Users' : 'Users Management')}
+                {activeSection === 'api-docs' && 'API Documentation'}
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400 mt-0.5">
                 {currentUser?.role === 'org_admin' ? 'Manage your organization' : 'Manage your multi-tenant platform'}
               </p>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-gray-900 dark:text-white font-medium">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Responsive Breakpoint Indicator - Remove after testing */}
+              <div className="flex items-center gap-2 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">
+                <span className="sm:hidden text-red-600">📱 Mobile</span>
+                <span className="hidden sm:inline md:hidden text-yellow-600">📱 Tablet</span>
+                <span className="hidden md:inline lg:hidden text-green-600">💻 Desktop</span>
+                <span className="hidden lg:inline text-blue-600">🖥️ Large</span>
+              </div>
+              <span className="hidden sm:inline text-xs sm:text-sm text-gray-900 dark:text-white font-medium">
                 {currentUser?.full_name || currentUser?.username}
               </span>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+              <span className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-medium ${
                 currentUser?.role === 'super_admin' 
                   ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                   : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
@@ -715,47 +724,47 @@ export default function AdminDashboard() {
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-3 sm:p-4 md:p-5 overflow-y-auto max-w-7xl mx-auto w-full">
           {/* Overview Section */}
           {activeSection === 'overview' && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                 {currentUser?.role === 'super_admin' && (
-                  <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="text-base sm:text-lg md:text-xl font-bold text-blue-600 dark:text-blue-400">
                       {stats.total_organizations}
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Total Organizations</div>
+                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Total Organizations</div>
                   </div>
                 )}
                 {currentUser?.role === 'org_admin' && (
-                  <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="text-sm sm:text-base md:text-lg font-bold text-blue-600 dark:text-blue-400 truncate">
                       {currentUser.organization?.name || 'My Organization'}
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Organization</div>
+                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Organization</div>
                   </div>
                 )}
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="text-base sm:text-lg md:text-xl font-bold text-blue-600 dark:text-blue-400">
                     {stats.total_users}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
                     {currentUser?.role === 'org_admin' ? 'Organization Users' : 'Total Users'}
                   </div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="text-base sm:text-lg md:text-xl font-bold text-blue-600 dark:text-blue-400">
                     {stats.active_users}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Active Users</div>
+                  <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Active Users</div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="text-base sm:text-lg md:text-xl font-bold text-blue-600 dark:text-blue-400">
                     {stats.total_chat_sessions}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
                     {currentUser?.role === 'org_admin' ? 'Organization Chats' : 'Total Chats'}
                   </div>
                 </div>
@@ -763,8 +772,8 @@ export default function AdminDashboard() {
 
               {/* Recent Activity */}
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <div className="p-4 sm:p-5 md:p-6 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                     {currentUser?.role === 'org_admin' ? 'My Organization' : 'Recent Organizations'}
                   </h3>
                 </div>
@@ -818,20 +827,20 @@ export default function AdminDashboard() {
 
           {/* Organizations Section */}
           {activeSection === 'organizations' && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Organizations Management</h3>
+                <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3">
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">Organizations Management</h3>
                   <button
                     onClick={() => setShowCreateOrgModal(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    className="px-3 py-1.5 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                   >
                     ➕ Create Organization
                   </button>
                 </div>
-                <div className="p-6">
+                <div className="p-3 sm:p-4">
                   {organizations.length === 0 ? (
-                    <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+                    <p className="text-center text-sm sm:text-base text-gray-500 dark:text-gray-400 py-8">
                       No organizations found
                     </p>
                   ) : (
@@ -839,12 +848,12 @@ export default function AdminDashboard() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-gray-200 dark:border-gray-700">
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Organization</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Plan</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Users</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Status</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Created</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Actions</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Organization</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Plan</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Users</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Status</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Created</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -962,14 +971,14 @@ export default function AdminDashboard() {
 
           {/* Users Section */}
           {activeSection === 'users' && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Users Management</h3>
+                <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-3 gap-2 sm:gap-3">
+                    <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">Users Management</h3>
                     <button
                       onClick={() => setShowCreateUserModal(true)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                      className="px-3 py-1.5 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                     >
                       ➕ Create User
                     </button>
@@ -977,15 +986,15 @@ export default function AdminDashboard() {
                   
                   {/* Filters - Only for Super Admin */}
                   {currentUser?.role === 'super_admin' && (
-                    <div className="flex gap-4 items-center">
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-start sm:items-center">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
+                        <label className="text-[10px] sm:text-xs font-medium text-gray-700 dark:text-gray-300">
                           Filter by Organization:
                         </label>
                         <select
                           value={selectedOrgFilter}
                           onChange={(e) => setSelectedOrgFilter(e.target.value)}
-                          className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                          className="w-full sm:w-auto px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                         >
                           <option value="all">All Organizations</option>
                           {organizations.map((org) => (
@@ -995,19 +1004,19 @@ export default function AdminDashboard() {
                           ))}
                         </select>
                       </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                      <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                         Showing {getFilteredAndSortedUsers().length} of {users.length} users
                       </div>
                     </div>
                   )}
                 </div>
-                <div className="p-6">
+                <div className="p-3 sm:p-4">
                   {users.length === 0 ? (
-                    <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+                    <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 py-6">
                       No users found
                     </p>
                   ) : getFilteredAndSortedUsers().length === 0 ? (
-                    <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+                    <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 py-6">
                       No users found matching the selected filter
                     </p>
                   ) : (
@@ -1015,32 +1024,32 @@ export default function AdminDashboard() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-gray-200 dark:border-gray-700">
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Username</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Email</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Organization</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Username</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Email</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Organization</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">
                               Role
-                              <span className="ml-1 text-xs text-gray-400">(sorted)</span>
+                              <span className="ml-1 text-[10px] sm:text-xs text-gray-400">(sorted)</span>
                             </th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Communities</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Status</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Last Login</th>
-                            <th className="text-left py-2 text-sm font-medium text-gray-600 dark:text-gray-400">Actions</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Communities</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Status</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Last Login</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {getFilteredAndSortedUsers().map((user) => (
                             <tr key={user.id} className="border-b border-gray-100 dark:border-gray-700">
-                              <td className="py-3">
+                              <td className="py-2">
                                 <div>
-                                  <div className="font-medium text-gray-900 dark:text-white">{user.username}</div>
-                                  <div className="text-sm text-gray-500 dark:text-gray-400">{user.full_name}</div>
+                                  <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">{user.username}</div>
+                                  <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">{user.full_name}</div>
                                 </div>
                               </td>
-                              <td className="py-3 text-sm text-gray-600 dark:text-gray-400">{user.email}</td>
-                              <td className="py-3 text-sm text-gray-600 dark:text-gray-400">{user.organization?.name || '-'}</td>
-                              <td className="py-3">
-                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              <td className="py-2 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">{user.email}</td>
+                              <td className="py-2 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">{user.organization?.name || '-'}</td>
+                              <td className="py-2">
+                                <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium ${
                                   user.role === 'super_admin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
                                   user.role === 'org_admin' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
                                   user.role === 'community_lead' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
@@ -1050,49 +1059,49 @@ export default function AdminDashboard() {
                                 </span>
                               </td>
                               <td className="py-3">
-                                {user.role === 'community_lead' && user.assigned_communities ? (
+                                {((user.role === 'community_lead' || user.role === 'user') && user.assigned_communities && Array.isArray(user.assigned_communities) && user.assigned_communities.length > 0) ? (
                                   <div className="flex gap-1 flex-wrap max-w-[200px]">
-                                    {JSON.parse(user.assigned_communities).map((comm: string) => (
-                                      <span key={comm} className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                    {user.assigned_communities.map((comm: string) => (
+                                      <span key={comm} className="px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                                         {comm}
                                       </span>
                                     ))}
                                   </div>
                                 ) : (
-                                  <span className="text-sm text-gray-400">-</span>
+                                  <span className="text-xs sm:text-sm text-gray-400">-</span>
                                 )}
                               </td>
                               <td className="py-3">
-                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium ${
                                   user.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                 }`}>
                                   {user.is_active ? 'ACTIVE' : 'INACTIVE'}
                                 </span>
                               </td>
-                              <td className="py-3 text-sm text-gray-600 dark:text-gray-400">
+                              <td className="py-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                                 {user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
                               </td>
                               <td className="py-3">
-                                <div className="flex gap-2">
+                                <div className="flex gap-1 sm:gap-2">
                                   <button
                                     onClick={() => {
                                       setSelectedUser(user);
                                       setEditUserForm({
                                         role: user.role,
-                                        assigned_communities: user.assigned_communities ? JSON.parse(user.assigned_communities) : [],
+                                        assigned_communities: Array.isArray(user.assigned_communities) ? user.assigned_communities : [],
                                         full_name: user.full_name,
                                         is_active: user.is_active
                                       });
                                       setShowEditUserModal(true);
                                     }}
-                                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
+                                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs sm:text-sm font-medium"
                                   >
                                     ✏️ Edit
                                   </button>
                                   {currentUser?.role === 'super_admin' && user.role !== 'super_admin' && user.id !== currentUser.id && (
                                     <button
                                       onClick={() => handleDeleteUser(user)}
-                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium"
+                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs sm:text-sm font-medium"
                                     >
                                       🗑️ Delete
                                     </button>
@@ -1105,6 +1114,275 @@ export default function AdminDashboard() {
                       </table>
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* API Documentation Section */}
+          {activeSection === 'api-docs' && (
+            <div className="space-y-4 sm:space-y-6">
+              <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-4 sm:p-5 md:p-6 text-white mb-4 sm:mb-6">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2">🚀 UnifiedWork API Documentation</h2>
+                <p className="text-xs sm:text-sm text-blue-100">
+                  Complete REST API reference for integrating with UnifiedWork platform
+                </p>
+              </div>
+
+              {/* Base URL */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">📍 Base URL</h3>
+                <div className="bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 rounded-lg font-mono text-xs sm:text-sm">
+                  <code className="text-blue-600 dark:text-blue-400">http://localhost:8000</code>
+                </div>
+                <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                  All API endpoints are relative to this base URL
+                </p>
+              </div>
+
+              {/* Authentication */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">🔐 Authentication</h3>
+                
+                <div className="space-y-3 sm:space-y-4">
+                  <div>
+                    <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2">Login</h4>
+                    <div className="bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-[10px] sm:text-xs font-bold">POST</span>
+                        <code className="text-xs sm:text-sm">/api/auth/login</code>
+                      </div>
+                      <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 mt-2 overflow-x-auto">{`{
+  "username": "admin",
+  "password": "admin123",
+  "organization_slug": "your-org-slug"  // Optional
+}`}</pre>
+                      <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mb-2">Response:</p>
+                        <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 overflow-x-auto">{`{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "email": "admin@unifiedwork.com",
+    "role": "super_admin",
+    "assigned_communities": ["qa", "backend"],
+    "organization": { ... }
+  }
+}`}</pre>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2">Using the Token</h4>
+                    <div className="bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 rounded-lg">
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        Include the token in the Authorization header for all protected endpoints:
+                      </p>
+                      <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Authorization: Bearer &lt;your_access_token&gt;</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Organizations API */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">🏢 Organizations API</h3>
+                
+                <div className="space-y-3 sm:space-y-4">
+                  {/* List Organizations */}
+                  <div className="border-l-4 border-blue-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded text-[10px] sm:text-xs font-bold">GET</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/organizations</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">List all organizations (Super Admin only)</p>
+                  </div>
+
+                  {/* Create Organization */}
+                  <div className="border-l-4 border-green-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-[10px] sm:text-xs font-bold">POST</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/organizations</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Create a new organization</p>
+                    <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded overflow-x-auto">{`{
+  "name": "Acme Inc",
+  "slug": "acme-inc",
+  "admin_email": "admin@acme.com",
+  "admin_username": "acme_admin",
+  "admin_password": "secure123",
+  "subscription_plan": "premium"
+}`}</pre>
+                  </div>
+
+                  {/* Update Organization */}
+                  <div className="border-l-4 border-yellow-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded text-[10px] sm:text-xs font-bold">PATCH</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/organizations/{`{org_id}`}</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Update organization details (subscription plan, status)</p>
+                  </div>
+
+                  {/* Block/Unblock Organization */}
+                  <div className="border-l-4 border-orange-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 rounded text-[10px] sm:text-xs font-bold">POST</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/organizations/{`{org_id}`}/block</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Block or unblock an organization</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Users API */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">👥 Users API</h3>
+                
+                <div className="space-y-3 sm:space-y-4">
+                  {/* List Users */}
+                  <div className="border-l-4 border-blue-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded text-[10px] sm:text-xs font-bold">GET</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/organizations/{`{org_id}`}/users</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">List all users in an organization</p>
+                    <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded mt-2 overflow-x-auto">{`// Response includes assigned_communities
+{
+  "users": [{
+    "id": 1,
+    "username": "john_qa",
+    "email": "john@acme.com",
+    "role": "community_lead",
+    "assigned_communities": ["qa", "backend"],
+    "is_active": true
+  }]
+}`}</pre>
+                  </div>
+
+                  {/* Create User */}
+                  <div className="border-l-4 border-green-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-[10px] sm:text-xs font-bold">POST</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/organizations/{`{org_id}`}/users</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Create a new user with community assignments</p>
+                    <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded overflow-x-auto">{`{
+  "username": "jane_qa",
+  "email": "jane@acme.com",
+  "password": "secure123",
+  "full_name": "Jane Doe",
+  "role": "community_lead",  // user, community_lead, org_admin
+  "assigned_communities": ["qa", "backend"]
+}`}</pre>
+                  </div>
+
+                  {/* Update User */}
+                  <div className="border-l-4 border-yellow-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded text-[10px] sm:text-xs font-bold">PATCH</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/organizations/{`{org_id}`}/users/{`{user_id}`}</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Update user role, communities, and status</p>
+                    <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded overflow-x-auto">{`{
+  "role": "community_lead",
+  "assigned_communities": ["qa", "frontend", "design"],
+  "full_name": "Jane Smith",
+  "is_active": true
+}`}</pre>
+                  </div>
+
+                  {/* Delete User */}
+                  <div className="border-l-4 border-red-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded text-[10px] sm:text-xs font-bold">DELETE</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/organizations/{`{org_id}`}/users/{`{user_id}`}</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Delete a user from an organization</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Communities Reference */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">🏘️ Available Communities</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
+                  {[
+                    { id: 'qa', name: 'QA Engineers', icon: '🎯' },
+                    { id: 'backend', name: 'Backend Developers', icon: '🔧' },
+                    { id: 'frontend', name: 'Frontend Developers', icon: '🎨' },
+                    { id: 'design', name: 'UI/UX Designers', icon: '✨' },
+                    { id: 'product', name: 'Product Managers', icon: '📊' },
+                    { id: 'devops', name: 'DevOps Engineers', icon: '🔐' },
+                    { id: 'analyst', name: 'Business System Analysts', icon: '�' }
+                  ].map(community => (
+                    <div key={community.id} className="bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg sm:text-xl">{community.icon}</span>
+                        <div>
+                          <div className="font-medium text-xs sm:text-sm text-gray-900 dark:text-white">{community.name}</div>
+                          <code className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">{community.id}</code>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Role Hierarchy */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">👑 Role Hierarchy</h3>
+                <div className="space-y-2 sm:space-y-3">
+                  <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-blue-600 text-white rounded text-[10px] sm:text-xs font-bold">SUPER_ADMIN</span>
+                    <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Full platform access, manage all organizations</span>
+                  </div>
+                  <div className="ml-4 sm:ml-8 flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-orange-600 text-white rounded text-[10px] sm:text-xs font-bold">ORG_ADMIN</span>
+                    <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Manage organization users, all community access</span>
+                  </div>
+                  <div className="ml-8 sm:ml-16 flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-purple-600 text-white rounded text-[10px] sm:text-xs font-bold">COMMUNITY_LEAD</span>
+                    <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Access assigned communities only</span>
+                  </div>
+                  <div className="ml-12 sm:ml-24 flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-green-600 text-white rounded text-[10px] sm:text-xs font-bold">USER</span>
+                    <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Access assigned communities only</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive API Tester */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">🧪 Quick Links</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  <a
+                    href="http://localhost:8000/docs"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all"
+                  >
+                    <span className="text-xl sm:text-2xl">📖</span>
+                    <div>
+                      <div className="text-sm sm:text-base font-semibold">Swagger Documentation</div>
+                      <div className="text-[10px] sm:text-xs text-blue-100">Interactive API explorer</div>
+                    </div>
+                  </a>
+                  <a
+                    href="http://localhost:8000/redoc"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all"
+                  >
+                    <span className="text-xl sm:text-2xl">📚</span>
+                    <div>
+                      <div className="text-sm sm:text-base font-semibold">ReDoc Documentation</div>
+                      <div className="text-xs text-purple-100">Clean API reference</div>
+                    </div>
+                  </a>
                 </div>
               </div>
             </div>
@@ -1582,7 +1860,7 @@ export default function AdminDashboard() {
                       { id: 'design', name: 'UI/UX Designers', icon: '✨' },
                       { id: 'product', name: 'Product Managers', icon: '📊' },
                       { id: 'devops', name: 'DevOps Engineers', icon: '🔐' },
-                      { id: 'docs', name: 'Technical Writers', icon: '📝' }
+                      { id: 'analyst', name: 'Business System Analysts', icon: '�' }
                     ].map((community) => (
                       <label key={community.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded">
                         <input
@@ -1741,7 +2019,7 @@ export default function AdminDashboard() {
                       { id: 'design', name: 'UI/UX Designers', icon: '✨' },
                       { id: 'product', name: 'Product Managers', icon: '📊' },
                       { id: 'devops', name: 'DevOps Engineers', icon: '🔐' },
-                      { id: 'docs', name: 'Technical Writers', icon: '📝' }
+                      { id: 'analyst', name: 'Business System Analysts', icon: '�' }
                     ].map((community) => (
                       <label key={community.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded">
                         <input

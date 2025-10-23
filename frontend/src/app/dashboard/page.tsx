@@ -12,6 +12,7 @@ interface User {
   email: string;
   full_name: string;
   role: string;
+  assigned_communities?: string[];
   organization?: {
     id: number;
     name: string;
@@ -27,7 +28,7 @@ const communities = [
   { id: 'design', name: 'UI/UX Designers', icon: '✨', agent: 'DesignGPT', color: 'bg-pink-500', description: 'Design systems and user experience' },
   { id: 'product', name: 'Product Managers', icon: '📊', agent: 'ProductGPT', color: 'bg-orange-500', description: 'Product strategy and roadmaps' },
   { id: 'devops', name: 'DevOps Engineers', icon: '🔐', agent: 'OpsGPT', color: 'bg-red-500', description: 'CI/CD, infrastructure, and deployment' },
-  { id: 'docs', name: 'Technical Writers', icon: '📝', agent: 'DocsGPT', color: 'bg-indigo-500', description: 'Documentation and technical writing' },
+  { id: 'analyst', name: 'Business System Analysts', icon: '�', agent: 'AnalystGPT', color: 'bg-indigo-500', description: 'Requirements analysis and process optimization' },
 ];
 
 export default function UserDashboard() {
@@ -99,7 +100,11 @@ export default function UserDashboard() {
           <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-5 lg:p-6 shadow-md hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between mb-1 sm:mb-2">
               <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-blue-600" />
-              <span className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white">7</span>
+              <span className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white">
+                {user.role === 'org_admin' || user.role === 'super_admin' 
+                  ? communities.length 
+                  : user.assigned_communities?.length || 0}
+              </span>
             </div>
             <p className="text-gray-600 dark:text-gray-400 text-[10px] sm:text-xs md:text-sm">Communities</p>
           </div>
@@ -134,32 +139,71 @@ export default function UserDashboard() {
         {/* Communities Grid */}
         <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
           <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4 md:mb-6">
-            Explore Communities
+            {user.role === 'org_admin' || user.role === 'super_admin' ? 'Explore Communities' : 'Your Communities'}
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-            {communities.map((community) => (
-              <Link
-                key={community.id}
-                href={`/community/${community.id}`}
-                className="group bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-5 lg:p-6 shadow-md hover:shadow-xl transition-all duration-200 border-2 border-transparent hover:border-blue-500 hover:scale-[1.02]"
-              >
-                <div className="flex items-center justify-between mb-2 sm:mb-3 md:mb-4">
-                  <div className={`${community.color} w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 rounded-lg sm:rounded-xl flex items-center justify-center text-base sm:text-lg md:text-xl group-hover:scale-110 transition-transform duration-200`}>
-                    {community.icon}
+          
+          {/* Show all communities for admins, filtered for regular users and community leads */}
+          {(() => {
+            const userCommunities = user.role === 'org_admin' || user.role === 'super_admin' 
+              ? communities 
+              : communities.filter(c => user.assigned_communities?.includes(c.id));
+            
+            if (userCommunities.length === 0) {
+              return (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg sm:rounded-xl p-4 sm:p-6 md:p-8">
+                  <div className="flex items-start space-x-3">
+                    <span className="text-2xl sm:text-3xl">⚠️</span>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-bold text-yellow-800 dark:text-yellow-200 mb-2">
+                        No Communities Assigned
+                      </h3>
+                      <p className="text-sm sm:text-base text-yellow-700 dark:text-yellow-300 mb-3">
+                        You don't have access to any communities yet. Please contact your organization administrator to assign communities to your account.
+                      </p>
+                      <p className="text-xs sm:text-sm text-yellow-600 dark:text-yellow-400">
+                        Once communities are assigned, you'll be able to access specialized AI assistants for your role.
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-[10px] sm:text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {community.agent}
-                  </span>
                 </div>
-                <h3 className="text-xs sm:text-sm md:text-base font-bold text-gray-900 dark:text-white mb-1 sm:mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                  {community.name}
-                </h3>
-                <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                  {community.description}
-                </p>
-              </Link>
-            ))}
-          </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+                {userCommunities.map((community) => (
+                  <a
+                    key={community.id}
+                    href={`/community/${community.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-5 lg:p-6 shadow-md hover:shadow-xl transition-all duration-200 border-2 border-transparent hover:border-blue-500 hover:scale-[1.02]"
+                  >
+                    <div className="flex items-center justify-between mb-2 sm:mb-3 md:mb-4">
+                      <div className={`${community.color} w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 rounded-lg sm:rounded-xl flex items-center justify-center text-base sm:text-lg md:text-xl group-hover:scale-110 transition-transform duration-200`}>
+                        {community.icon}
+                      </div>
+                      <span className="text-[10px] sm:text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400">
+                        {community.agent}
+                      </span>
+                    </div>
+                    <h3 className="text-xs sm:text-sm md:text-base font-bold text-gray-900 dark:text-white mb-1 sm:mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {community.name}
+                    </h3>
+                    <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                      {community.description}
+                    </p>
+                    <div className="mt-2 flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400">
+                      <span>Open in new tab</span>
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Recent Activity Placeholder */}

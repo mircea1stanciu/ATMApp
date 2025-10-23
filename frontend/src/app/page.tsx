@@ -66,11 +66,11 @@ const communities = [
     textColor: 'text-red-600'
   },
   {
-    id: 'docs',
-    name: 'Technical Writers',
-    icon: '📝',
-    agent: 'DocsGPT',
-    description: 'Documentation, guides, tutorials and more',
+    id: 'analyst',
+    name: 'Business System Analysts',
+    icon: '�',
+    agent: 'AnalystGPT',
+    description: 'Requirements analysis and process optimization',
     color: 'bg-indigo-500',
     borderColor: 'border-indigo-200',
     textColor: 'text-indigo-600'
