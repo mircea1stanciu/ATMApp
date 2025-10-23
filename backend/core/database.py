@@ -125,6 +125,7 @@ class User(Base):
     preferred_communities = Column(String, nullable=True)  # JSON string of community preferences
     theme_preference = Column(String, default="system")  # light, dark, system
     preferred_ai_model = Column(String, default="gpt-4o-mini")  # User's preferred AI model
+    ai_model_provider = Column(String, default="openai")  # openai or anthropic
     ai_temperature = Column(String, default="0.7")  # AI creativity level (0.0-1.0)
     
     # Timestamps
@@ -169,6 +170,8 @@ class ChatSession(Base):
     message = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
     model_used = Column(String, default="gpt-4o-mini")  # Which AI model was used
+    model_id = Column(String, nullable=True)       # Model ID (e.g., "gpt-4", "claude-3-opus")
+    model_provider = Column(String, nullable=True) # openai or anthropic
     
     # Metadata
     response_time_ms = Column(Integer, nullable=True)  # Response time in milliseconds
