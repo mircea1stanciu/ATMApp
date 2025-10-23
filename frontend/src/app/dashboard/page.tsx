@@ -138,40 +138,20 @@ export default function UserDashboard() {
 
         {/* Communities Grid */}
         <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
-          <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4 md:mb-6">
-            {user.role === 'org_admin' || user.role === 'super_admin' ? 'Explore Communities' : 'Your Communities'}
-          </h2>
+          <div className="flex items-center justify-between mb-3 sm:mb-4 md:mb-6">
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white">
+              Your Communities
+            </h2>
+            {user.role === 'community_lead' && (
+              <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-semibold rounded-full border border-indigo-300 dark:border-indigo-700">
+                🎖️ Community Lead
+              </span>
+            )}
+          </div>
           
-          {/* Show all communities for admins, filtered for regular users and community leads */}
-          {(() => {
-            const userCommunities = user.role === 'org_admin' || user.role === 'super_admin' 
-              ? communities 
-              : communities.filter(c => user.assigned_communities?.includes(c.id));
-            
-            if (userCommunities.length === 0) {
-              return (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg sm:rounded-xl p-4 sm:p-6 md:p-8">
-                  <div className="flex items-start space-x-3">
-                    <span className="text-2xl sm:text-3xl">⚠️</span>
-                    <div>
-                      <h3 className="text-base sm:text-lg font-bold text-yellow-800 dark:text-yellow-200 mb-2">
-                        No Communities Assigned
-                      </h3>
-                      <p className="text-sm sm:text-base text-yellow-700 dark:text-yellow-300 mb-3">
-                        You don't have access to any communities yet. Please contact your organization administrator to assign communities to your account.
-                      </p>
-                      <p className="text-xs sm:text-sm text-yellow-600 dark:text-yellow-400">
-                        Once communities are assigned, you'll be able to access specialized AI assistants for your role.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-                {userCommunities.map((community) => (
+          {/* Community Leads and regular Users have access to all communities */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+                {communities.map((community) => (
                   <a
                     key={community.id}
                     href={`/community/${community.id}`}
@@ -202,8 +182,6 @@ export default function UserDashboard() {
                   </a>
                 ))}
               </div>
-            );
-          })()}
         </div>
 
         {/* Recent Activity Placeholder */}

@@ -357,7 +357,13 @@ export default function CommunityPage() {
         return;
       }
       
-      // Regular users and community leads need to have the community assigned
+      // Community leads have access to all communities (elevated user role for future features)
+      if (userData.role === 'community_lead') {
+        setHasAccess(true);
+        return;
+      }
+      
+      // Regular users need to have the community assigned
       const assignedCommunities = userData.assigned_communities || [];
       const hasAccessToCommunity = assignedCommunities.includes(communityId);
       setHasAccess(hasAccessToCommunity);
