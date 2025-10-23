@@ -93,7 +93,7 @@ export default function ProjectsPage({ communityId, communityName }: ProjectsPag
                     </div>
                   </div>
                 ) : (
-                  `${communityName} Projects`
+                  'All Projects'
                 )}
               </h1>
             </div>
@@ -120,7 +120,6 @@ export default function ProjectsPage({ communityId, communityName }: ProjectsPag
         {view === 'list' ? (
           <ProjectList
             key={refreshKey}
-            communityId={communityId}
             onProjectClick={handleProjectClick}
             onCreateProject={() => setShowCreateProject(true)}
           />

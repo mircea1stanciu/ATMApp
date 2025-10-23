@@ -146,13 +146,51 @@ async def create_project(
     return {"message": "Project created successfully", "project": project}
 
 
+@router.get("/organization")
+async def get_organization_projects(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all projects for the user's organization - All organization members can view"""
+    # Check user belongs to organization
+    check_organization_member(current_user)
+    
+    projects = db.query(Project).filter(
+        Project.organization_id == current_user.organization_id,
+        Project.is_archived == False
+    ).all()
+    
+    # Get issue count for each project
+    project_list = []
+    for project in projects:
+        issue_count = db.query(Issue).filter(Issue.project_id == project.id).count()
+        project_dict = {
+            "id": project.id,
+            "key": project.key,
+            "name": project.name,
+            "description": project.description,
+            "icon": project.icon,
+            "color": project.color,
+            "is_active": project.is_active,
+            "issue_count": issue_count,
+            "lead": {
+                "id": project.lead.id,
+                "full_name": project.lead.full_name,
+                "username": project.lead.username
+            } if project.lead else None
+        }
+        project_list.append(project_dict)
+    
+    return {"projects": project_list}
+
+
 @router.get("/community/{community_id}")
 async def get_community_projects(
     community_id: str,
     current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all projects for a community - All organization members can view"""
+    """Get all projects for a specific community - All organization members can view"""
     # Check user belongs to organization
     check_organization_member(current_user)
     projects = db.query(Project).filter(

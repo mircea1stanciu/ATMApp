@@ -17,12 +17,11 @@ interface Project {
 }
 
 interface ProjectListProps {
-  communityId: string;
   onProjectClick: (project: Project) => void;
   onCreateProject: () => void;
 }
 
-export default function ProjectList({ communityId, onProjectClick, onCreateProject }: ProjectListProps) {
+export default function ProjectList({ onProjectClick, onCreateProject }: ProjectListProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -31,7 +30,7 @@ export default function ProjectList({ communityId, onProjectClick, onCreateProje
   useEffect(() => {
     checkPermissions();
     fetchProjects();
-  }, [communityId]);
+  }, []); // No dependencies since we fetch all organization projects
 
   const checkPermissions = () => {
     try {
@@ -61,8 +60,9 @@ export default function ProjectList({ communityId, onProjectClick, onCreateProje
   const fetchProjects = async () => {
     try {
       const token = localStorage.getItem('token');
+      // Fetch all organization projects instead of community-specific
       const response = await fetch(
-        `http://localhost:8000/api/projects/community/${communityId}`,
+        `http://localhost:8000/api/projects/organization`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -129,8 +129,8 @@ export default function ProjectList({ communityId, onProjectClick, onCreateProje
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Projects</h2>
-          <p className="text-gray-600 mt-1">Manage your team's projects</p>
+          <h2 className="text-2xl font-bold text-gray-900">Organization Projects</h2>
+          <p className="text-gray-600 mt-1">All projects across your organization</p>
         </div>
         {canManageProjects && (
           <button
