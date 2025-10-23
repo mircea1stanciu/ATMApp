@@ -60,7 +60,7 @@ export default function ModelSelector({ onModelSelect, currentModel }: ModelSele
         }
       });
       const data = await response.json();
-      setTemperature(data.temperature || 0.7);
+      setTemperature(parseFloat(data.ai_temperature) || 0.7);
     } catch (error) {
       console.error('Failed to load preferences:', error);
     }
@@ -113,6 +113,48 @@ export default function ModelSelector({ onModelSelect, currentModel }: ModelSele
     return provider === 'openai' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
            provider === 'anthropic' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
            'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+  };
+
+  // Get maximum temperature based on subscription plan
+  const getMaxTemperature = (): number => {
+    switch (subscription.toLowerCase()) {
+      case 'free':
+        return 0.5;
+      case 'basic':
+        return 0.7;
+      case 'premium':
+      case 'enterprise':
+        return 1.0;
+      default:
+        return 0.7;
+    }
+  };
+
+  // Get contextual description based on temperature value
+  const getTemperatureDescription = (): string => {
+    if (temperature <= 0.2) {
+      return '❄️ Very Precise: Highly focused and consistent responses. Best for code reviews and technical tasks.';
+    } else if (temperature <= 0.4) {
+      return '🎯 Focused: Balanced precision with some variation. Good for development work.';
+    } else if (temperature <= 0.6) {
+      return '⚖️ Balanced: Equal mix of precision and creativity. Ideal for most use cases.';
+    } else if (temperature <= 0.8) {
+      return '✨ Creative: More varied and exploratory responses. Great for brainstorming.';
+    } else {
+      return '🎨 Very Creative: Maximum creativity and variation. Perfect for innovative solutions.';
+    }
+  };
+
+  // Get the next plan for upgrade prompts
+  const getNextPlan = (): string => {
+    switch (subscription.toLowerCase()) {
+      case 'free':
+        return 'Basic';
+      case 'basic':
+        return 'Premium';
+      default:
+        return 'Premium';
+    }
   };
 
   if (loading) {
@@ -227,28 +269,105 @@ export default function ModelSelector({ onModelSelect, currentModel }: ModelSele
         ))}
       </div>
 
-      {/* Temperature Control */}
-      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Creativity Level (Temperature): {temperature.toFixed(1)}
-        </label>
+      {/* Temperature Control - Enhanced */}
+      <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg p-6 border border-purple-200 dark:border-purple-800">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Brain className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <label className="text-sm font-semibold text-gray-900 dark:text-white">
+              Creativity Level (Temperature)
+            </label>
+          </div>
+          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+            {temperature.toFixed(1)}
+          </div>
+        </div>
+
+        <style jsx>{`
+          .gradient-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: linear-gradient(to right, #60a5fa, #a78bfa, #ec4899);
+            outline: none;
+            opacity: 0.9;
+            transition: opacity 0.2s;
+          }
+
+          .gradient-slider:hover {
+            opacity: 1;
+          }
+
+          .gradient-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+          }
+
+          .gradient-slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+          }
+        `}</style>
+
         <input
           type="range"
           min="0"
-          max="1"
+          max={getMaxTemperature()}
           step="0.1"
           value={temperature}
           onChange={(e) => setTemperature(parseFloat(e.target.value))}
-          className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+          className="gradient-slider mb-3"
         />
-        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-          <span>Precise (0.0)</span>
-          <span>Balanced (0.5)</span>
-          <span>Creative (1.0)</span>
+
+        <div className="flex justify-between text-xs font-medium text-gray-600 dark:text-gray-400 mb-4">
+          <span>❄️ Precise</span>
+          <span>⚖️ Balanced</span>
+          <span>🎨 Creative</span>
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          Lower values make responses more focused and deterministic. Higher values make them more creative and varied.
-        </p>
+
+        {/* Temperature Description */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-3 mb-3">
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            {getTemperatureDescription()}
+          </p>
+        </div>
+
+        {/* Subscription Limit Warning */}
+        {getMaxTemperature() < 1.0 && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <Info className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-yellow-800 dark:text-yellow-300">
+                <p className="font-medium mb-1">
+                  🔒 {subscription.toUpperCase()} Plan Limit
+                </p>
+                <p>
+                  Temperature limited to {getMaxTemperature().toFixed(1)} on your current plan.{' '}
+                  <a
+                    href="/settings?tab=subscription"
+                    className="underline hover:text-yellow-900 dark:hover:text-yellow-200"
+                  >
+                    Upgrade to {getNextPlan()}
+                  </a>
+                  {' '}for full creativity control (0.0 - 1.0).
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Save Button */}

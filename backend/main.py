@@ -601,7 +601,7 @@ async def set_preferred_model(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Set user's preferred AI model"""
+    """Set user's preferred AI model and temperature"""
     from core.model_manager import ModelManager
     
     # Validate model exists
@@ -626,6 +626,20 @@ async def set_preferred_model(
     if temperature is not None:
         if not 0.0 <= temperature <= 1.0:
             raise HTTPException(status_code=400, detail="Temperature must be between 0.0 and 1.0")
+        
+        # Subscription-based temperature limits
+        max_temp = 1.0
+        if subscription.lower() == "free":
+            max_temp = 0.5
+        elif subscription.lower() == "basic":
+            max_temp = 0.7
+        
+        if temperature > max_temp:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Temperature limited to {max_temp} for {subscription.upper()} plan. Upgrade for full control."
+            )
+        
         current_user.ai_temperature = str(temperature)
     
     db.commit()
@@ -634,6 +648,8 @@ async def set_preferred_model(
         "message": "Preferences updated successfully",
         "preferred_model": model_id,
         "temperature": float(current_user.ai_temperature),
+        "max_temperature": max_temp if temperature is not None else 1.0,
+        "subscription": subscription,
         "model_info": ModelManager.get_model_info(model_id)
     }
 
