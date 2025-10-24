@@ -321,6 +321,29 @@ class Message(Base):
     )
 
 
+class MessageReaction(Base):
+    """Message reactions (emoji reactions on messages)"""
+    __tablename__ = "message_reactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(Integer, ForeignKey("messages.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    emoji = Column(String(10), nullable=False)  # Emoji Unicode
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    message = relationship("Message")
+    user = relationship("User")
+    
+    # Unique constraint - one reaction type per user per message
+    __table_args__ = (
+        UniqueConstraint('message_id', 'user_id', 'emoji', name='unique_user_message_reaction'),
+        {'extend_existing': True}
+    )
+
+
 def get_db():
     """Get database session"""
     db = SessionLocal()

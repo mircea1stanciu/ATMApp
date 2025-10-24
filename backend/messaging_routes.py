@@ -5,7 +5,10 @@ Real-time messaging functionality with WebSocket support
 
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
+import os
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, desc, func
 from pydantic import BaseModel
@@ -25,6 +28,14 @@ class UserPresenceResponse(BaseModel):
     last_seen: Optional[datetime]
     is_typing: bool
 
+class FileAttachment(BaseModel):
+    id: int
+    filename: str
+    original_filename: str
+    file_size: int
+    content_type: str
+    upload_url: str
+
 class MessageResponse(BaseModel):
     id: int
     content: str
@@ -36,6 +47,8 @@ class MessageResponse(BaseModel):
     edited: bool
     edited_at: Optional[datetime]
     reply_to_message_id: Optional[int]
+    attachments: Optional[List[FileAttachment]] = []
+    reactions: Optional[Dict[str, List[Dict]]] = {}
 
 class ConversationResponse(BaseModel):
     id: int
@@ -242,6 +255,18 @@ async def get_conversations(
         last_message = None
         if conv.messages:
             last_msg = conv.messages[-1]
+            # Create attachment if file exists
+            attachments = []
+            if last_msg.file_url:
+                attachments.append(FileAttachment(
+                    id=last_msg.id,
+                    filename=last_msg.file_url.split('/')[-1],
+                    original_filename=last_msg.file_name or last_msg.file_url.split('/')[-1],
+                    file_size=last_msg.file_size or 0,
+                    content_type=last_msg.file_type or 'application/octet-stream',
+                    upload_url=last_msg.file_url
+                ))
+                
             last_message = MessageResponse(
                 id=last_msg.id,
                 content=last_msg.content,
@@ -252,7 +277,9 @@ async def get_conversations(
                 created_at=last_msg.created_at,
                 edited=last_msg.edited,
                 edited_at=last_msg.edited_at,
-                reply_to_message_id=last_msg.reply_to_message_id
+                reply_to_message_id=last_msg.reply_to_message_id,
+                attachments=attachments,
+                reactions={}
             )
         
         result.append(ConversationResponse(
@@ -317,6 +344,33 @@ async def get_conversation_detail(
     # Get messages
     messages = []
     for msg in conversation.messages:
+        # Create attachment if file exists
+        attachments = []
+        if msg.file_url:
+            attachments.append(FileAttachment(
+                id=msg.id,
+                filename=msg.file_url.split('/')[-1],
+                original_filename=msg.file_name or msg.file_url.split('/')[-1],
+                file_size=msg.file_size or 0,
+                content_type=msg.file_type or 'application/octet-stream',
+                upload_url=msg.file_url
+            ))
+        
+        # Get reactions for this message
+        from core.database import MessageReaction
+        reactions_query = db.query(MessageReaction).filter(
+            MessageReaction.message_id == msg.id
+        ).all()
+        
+        reaction_counts = {}
+        for reaction in reactions_query:
+            if reaction.emoji not in reaction_counts:
+                reaction_counts[reaction.emoji] = []
+            reaction_counts[reaction.emoji].append({
+                "user_id": reaction.user_id,
+                "username": reaction.user.username
+            })
+            
         messages.append(MessageResponse(
             id=msg.id,
             content=msg.content,
@@ -327,7 +381,9 @@ async def get_conversation_detail(
             created_at=msg.created_at,
             edited=msg.edited,
             edited_at=msg.edited_at,
-            reply_to_message_id=msg.reply_to_message_id
+            reply_to_message_id=msg.reply_to_message_id,
+            attachments=attachments,
+            reactions=reaction_counts
         ))
     
     # Mark as read
@@ -446,7 +502,7 @@ async def send_message(
     db.commit()
     db.refresh(message)
     
-    # Create response
+    # Create response (no attachments for regular text messages)
     message_response = MessageResponse(
         id=message.id,
         content=message.content,
@@ -457,7 +513,163 @@ async def send_message(
         created_at=message.created_at,
         edited=message.edited,
         edited_at=message.edited_at,
-        reply_to_message_id=message.reply_to_message_id
+        reply_to_message_id=message.reply_to_message_id,
+        attachments=[],
+        reactions={}
+    )
+    
+    # Broadcast message to conversation participants
+    await manager.broadcast_to_conversation({
+        "type": "new_message",
+        "conversation_id": conversation_id,
+        "message": message_response.dict()
+    }, conversation_id, db, exclude_user_id=current_user.id)
+    
+    return message_response
+
+
+# File upload configuration
+UPLOAD_DIR = "uploads/messages"
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_EXTENSIONS = {
+    'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 
+    'xls', 'xlsx', 'ppt', 'pptx', 'mp4', 'mov', 'avi', 'zip', 'rar'
+}
+
+# Ensure upload directory exists
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+def allowed_file(filename: str) -> bool:
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@router.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload a file for messaging"""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+    
+    if not allowed_file(file.filename):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"File type not allowed. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+    
+    # Read file content and check size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)}MB"
+        )
+    
+    # Generate unique filename
+    file_extension = file.filename.rsplit('.', 1)[1].lower()
+    unique_filename = f"{uuid.uuid4()}.{file_extension}"
+    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    
+    # Save file
+    with open(file_path, "wb") as f:
+        f.write(content)
+    
+    return {
+        "filename": unique_filename,
+        "original_filename": file.filename,
+        "file_size": len(content),
+        "content_type": file.content_type,
+        "upload_url": f"/api/v1/messaging/files/{unique_filename}"
+    }
+
+
+@router.get("/files/{filename}")
+async def download_file(
+    filename: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Download a file"""
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type='application/octet-stream'
+    )
+
+
+@router.post("/conversations/{conversation_id}/messages/with-file")
+async def send_message_with_file(
+    conversation_id: int,
+    content: str = "",
+    file_info: Optional[dict] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Send a message with an optional file attachment"""
+    # Verify user is participant
+    participant = db.query(ConversationParticipant).filter(
+        ConversationParticipant.conversation_id == conversation_id,
+        ConversationParticipant.user_id == current_user.id,
+        ConversationParticipant.is_active == True
+    ).first()
+    
+    if not participant:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Determine message type
+    message_type = MessageType.FILE if file_info else MessageType.TEXT
+    
+    # Create message
+    message = Message(
+        conversation_id=conversation_id,
+        sender_id=current_user.id,
+        content=content or (f"📎 {file_info['original_filename']}" if file_info else ""),
+        message_type=message_type,
+        file_url=file_info.get('upload_url') if file_info else None,
+        file_name=file_info.get('original_filename') if file_info else None,
+        file_size=file_info.get('file_size') if file_info else None,
+        file_type=file_info.get('content_type') if file_info else None
+    )
+    db.add(message)
+    
+    # Update conversation activity
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    conversation.last_activity = datetime.utcnow()
+    conversation.last_message_id = message.id
+    
+    db.commit()
+    db.refresh(message)
+    
+    # Create response
+    attachment = None
+    if file_info:
+        attachment = FileAttachment(
+            id=message.id,
+            filename=file_info['filename'],
+            original_filename=file_info['original_filename'],
+            file_size=file_info['file_size'],
+            content_type=file_info['content_type'],
+            upload_url=file_info['upload_url']
+        )
+    
+    message_response = MessageResponse(
+        id=message.id,
+        content=message.content,
+        message_type=message.message_type.value,
+        sender_id=message.sender_id,
+        sender_username=current_user.username,
+        sender_full_name=current_user.full_name or current_user.username,
+        created_at=message.created_at,
+        edited=message.edited,
+        edited_at=message.edited_at,
+        reply_to_message_id=message.reply_to_message_id,
+        attachments=[attachment] if attachment else [],
+        reactions={}
     )
     
     # Broadcast message to conversation participants
@@ -562,3 +774,124 @@ async def get_organization_users(
         })
     
     return result
+
+
+# Message Reactions
+@router.post("/messages/{message_id}/reactions")
+async def add_reaction(
+    message_id: int,
+    emoji: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Add or remove a reaction to a message"""
+    from core.database import MessageReaction
+    
+    # Verify message exists and user has access
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    # Check if user is participant in the conversation
+    participant = db.query(ConversationParticipant).filter(
+        ConversationParticipant.conversation_id == message.conversation_id,
+        ConversationParticipant.user_id == current_user.id,
+        ConversationParticipant.is_active == True
+    ).first()
+    
+    if not participant:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Check if reaction already exists
+    existing_reaction = db.query(MessageReaction).filter(
+        MessageReaction.message_id == message_id,
+        MessageReaction.user_id == current_user.id,
+        MessageReaction.emoji == emoji
+    ).first()
+    
+    if existing_reaction:
+        # Remove reaction
+        db.delete(existing_reaction)
+        db.commit()
+        action = "removed"
+    else:
+        # Add reaction
+        reaction = MessageReaction(
+            message_id=message_id,
+            user_id=current_user.id,
+            emoji=emoji
+        )
+        db.add(reaction)
+        db.commit()
+        action = "added"
+    
+    # Get updated reaction counts
+    reactions = db.query(MessageReaction).filter(
+        MessageReaction.message_id == message_id
+    ).all()
+    
+    reaction_counts = {}
+    for reaction in reactions:
+        if reaction.emoji not in reaction_counts:
+            reaction_counts[reaction.emoji] = []
+        reaction_counts[reaction.emoji].append({
+            "user_id": reaction.user_id,
+            "username": reaction.user.username
+        })
+    
+    # Broadcast reaction update to conversation participants
+    await manager.broadcast_to_conversation({
+        "type": "reaction_update",
+        "message_id": message_id,
+        "emoji": emoji,
+        "action": action,
+        "user_id": current_user.id,
+        "reactions": reaction_counts
+    }, message.conversation_id, db)
+    
+    return {
+        "action": action,
+        "emoji": emoji,
+        "reactions": reaction_counts
+    }
+
+
+@router.get("/messages/{message_id}/reactions")
+async def get_reactions(
+    message_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all reactions for a message"""
+    from core.database import MessageReaction
+    
+    # Verify message exists and user has access
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    # Check if user is participant in the conversation
+    participant = db.query(ConversationParticipant).filter(
+        ConversationParticipant.conversation_id == message.conversation_id,
+        ConversationParticipant.user_id == current_user.id,
+        ConversationParticipant.is_active == True
+    ).first()
+    
+    if not participant:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Get reactions
+    reactions = db.query(MessageReaction).filter(
+        MessageReaction.message_id == message_id
+    ).all()
+    
+    reaction_counts = {}
+    for reaction in reactions:
+        if reaction.emoji not in reaction_counts:
+            reaction_counts[reaction.emoji] = []
+        reaction_counts[reaction.emoji].append({
+            "user_id": reaction.user_id,
+            "username": reaction.user.username
+        })
+    
+    return reaction_counts

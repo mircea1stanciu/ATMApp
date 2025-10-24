@@ -12,6 +12,15 @@ interface User {
   last_seen?: string;
 }
 
+interface FileAttachment {
+  id: number;
+  filename: string;
+  original_filename: string;
+  file_size: number;
+  content_type: string;
+  upload_url: string;
+}
+
 interface Message {
   id: number;
   content: string;
@@ -19,6 +28,8 @@ interface Message {
   conversation_id: number;
   timestamp: string;
   sender?: User;
+  attachments?: FileAttachment[];
+  reactions?: { [emoji: string]: { user_id: number; username: string }[] };
 }
 
 interface Conversation {
@@ -58,8 +69,11 @@ export default function MessengerView() {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
   const [groupName, setGroupName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // API base URL
   const API_BASE = 'http://localhost:8001';
@@ -147,6 +161,12 @@ export default function MessengerView() {
 
   // Send message
   const sendMessage = async () => {
+    // If file is selected, send with file
+    if (selectedFile) {
+      await sendMessageWithFile(selectedFile, newMessage.trim());
+      return;
+    }
+
     if (!newMessage.trim() || !selectedConversation || !currentUser) return;
 
     try {
@@ -254,6 +274,133 @@ export default function MessengerView() {
         ? prev.filter(u => u.id !== user.id)
         : [...prev, user]
     );
+  };
+
+  // File upload functions
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const uploadFile = async (file: File): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE}/api/v1/messaging/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('File upload failed');
+    }
+
+    return response.json();
+  };
+
+  const sendMessageWithFile = async (file: File, messageText: string = '') => {
+    if (!selectedConversation || !currentUser) return;
+
+    setIsUploading(true);
+    try {
+      // Upload file first
+      const fileInfo = await uploadFile(file);
+
+      // Send message with file attachment
+      const response = await fetch(`${API_BASE}/api/v1/messaging/conversations/${selectedConversation.id}/messages/with-file`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          content: messageText,
+          file_info: fileInfo
+        })
+      });
+
+      if (response.ok) {
+        const sentMessage = await response.json();
+        setMessages(prev => [...prev, sentMessage]);
+        setNewMessage('');
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        scrollToBottom();
+        
+        // Update conversation list
+        loadConversations();
+      }
+    } catch (error) {
+      console.error('Error sending file:', error);
+      alert('Failed to send file. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = (contentType: string): string => {
+    if (contentType.startsWith('image/')) return '🖼️';
+    if (contentType.startsWith('video/')) return '🎥';
+    if (contentType.startsWith('audio/')) return '🎵';
+    if (contentType.includes('pdf')) return '📄';
+    if (contentType.includes('document') || contentType.includes('docx')) return '📝';
+    if (contentType.includes('spreadsheet') || contentType.includes('xlsx')) return '📊';
+    if (contentType.includes('zip') || contentType.includes('rar')) return '📦';
+    return '📎';
+  };
+
+  // Reaction functions
+  const addReaction = async (messageId: number, emoji: string) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/messaging/messages/${messageId}/reactions`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ emoji })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // Update will come through WebSocket, but we can also update locally
+        setMessages(prev => prev.map(msg => 
+          msg.id === messageId 
+            ? { ...msg, reactions: result.reactions }
+            : msg
+        ));
+      }
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+    }
+  };
+
+  const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😠'];
+
+  const getReactionSummary = (reactions: { [emoji: string]: { user_id: number; username: string }[] }) => {
+    const summary: { emoji: string; count: number; users: string[]; hasCurrentUser: boolean }[] = [];
+    
+    Object.entries(reactions).forEach(([emoji, users]) => {
+      if (users.length > 0) {
+        summary.push({
+          emoji,
+          count: users.length,
+          users: users.map(u => u.username),
+          hasCurrentUser: users.some(u => u.user_id === currentUser?.id)
+        });
+      }
+    });
+    
+    return summary;
   };
 
   // WebSocket connection
@@ -690,11 +837,102 @@ export default function MessengerView() {
                       ? 'bg-blue-600 text-white'
                       : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600'
                   }`}>
-                    <div className="text-sm">{message.content}</div>
+                    {/* Message content */}
+                    {message.content && (
+                      <div className="text-sm">{message.content}</div>
+                    )}
+                    
+                    {/* File attachments */}
+                    {message.attachments && message.attachments.length > 0 && (
+                      <div className={`${message.content ? 'mt-2' : ''} space-y-2`}>
+                        {message.attachments.map((attachment, index) => (
+                          <div
+                            key={index}
+                            className={`flex items-center gap-2 p-2 rounded border ${
+                              message.sender_id === currentUser?.id
+                                ? 'bg-blue-700 border-blue-500'
+                                : 'bg-gray-50 dark:bg-gray-600 border-gray-200 dark:border-gray-500'
+                            }`}
+                          >
+                            <span className="text-lg">
+                              {getFileIcon(attachment.content_type)}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">
+                                {attachment.original_filename}
+                              </div>
+                              <div className={`text-xs ${
+                                message.sender_id === currentUser?.id ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
+                              }`}>
+                                {formatFileSize(attachment.file_size)}
+                              </div>
+                            </div>
+                            <a
+                              href={`${API_BASE}${attachment.upload_url}`}
+                              download={attachment.original_filename}
+                              className={`p-1 rounded hover:bg-opacity-80 transition-colors ${
+                                message.sender_id === currentUser?.id
+                                  ? 'text-blue-100 hover:bg-blue-800'
+                                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-500'
+                              }`}
+                              title="Download file"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
                     <div className={`text-xs mt-1 ${
                       message.sender_id === currentUser?.id ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
                     }`}>
                       {formatTimestamp(message.timestamp)}
+                    </div>
+
+                    {/* Reactions Display */}
+                    {message.reactions && Object.keys(message.reactions).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {getReactionSummary(message.reactions).map((reaction) => (
+                          <button
+                            key={reaction.emoji}
+                            onClick={() => addReaction(message.id, reaction.emoji)}
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                              reaction.hasCurrentUser
+                                ? message.sender_id === currentUser?.id
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-blue-200 text-blue-900 dark:bg-blue-600 dark:text-white'
+                                : message.sender_id === currentUser?.id
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                  : 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-500'
+                            }`}
+                            title={reaction.users.join(', ')}
+                          >
+                            <span>{reaction.emoji}</span>
+                            <span>{reaction.count}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Quick Reaction Buttons */}
+                    <div className="flex gap-0.5 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {QUICK_REACTIONS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={() => addReaction(message.id, emoji)}
+                          className={`p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors ${
+                            message.sender_id === currentUser?.id
+                              ? 'hover:bg-blue-700'
+                              : ''
+                          }`}
+                          title={`React with ${emoji}`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
@@ -710,27 +948,90 @@ export default function MessengerView() {
 
             {/* Message Input */}
             <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              {/* File preview */}
+              {selectedFile && (
+                <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{getFileIcon(selectedFile.type)}</span>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {selectedFile.name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatFileSize(selectedFile.size)}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedFile(null);
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = '';
+                        }
+                      }}
+                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2">
+                {/* File attachment button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  title="Attach file"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                </button>
+
                 <textarea
                   ref={messageInputRef}
                   value={newMessage}
                   onChange={handleMessageInputChange}
                   onKeyPress={handleKeyPress}
-                  placeholder="Type a message..."
+                  placeholder={selectedFile ? "Add a message to your file..." : "Type a message..."}
                   className="flex-1 resize-none border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm min-h-[40px] max-h-[120px]"
                   rows={1}
                 />
+                
                 <button
                   onClick={sendMessage}
-                  disabled={!newMessage.trim()}
+                  disabled={(!newMessage.trim() && !selectedFile) || isUploading}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm flex items-center gap-2"
                 >
-                  <span>Send</span>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
+                  {isUploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Send</span>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                    </>
+                  )}
                 </button>
               </div>
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={handleFileSelect}
+                accept=".txt,.pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp4,.mov,.avi,.zip,.rar"
+                className="hidden"
+              />
             </div>
           </>
         ) : (
