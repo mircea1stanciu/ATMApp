@@ -557,15 +557,18 @@ async def community_chat(
 
 # AI Model Management Endpoints (GitHub Copilot-style)
 @app.get("/api/ai-models", tags=["AI Models"])
-async def get_available_models(current_user: User = Depends(get_current_user)):
+async def get_available_models(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """Get list of available AI models"""
     from core.model_manager import ModelManager
     
-    # Get user's subscription plan
+    # Get user's subscription plan from organization
     subscription = "free"
     if current_user.organization_id:
-        org = await get_db().query(Organization).filter(Organization.id == current_user.organization_id).first()
-        if org:
+        org = db.query(Organization).filter(Organization.id == current_user.organization_id).first()
+        if org and org.subscription_plan:
             subscription = org.subscription_plan.value
     
     models = ModelManager.get_available_models()
