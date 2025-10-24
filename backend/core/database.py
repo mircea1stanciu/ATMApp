@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional
 import enum
 import secrets
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum, ForeignKey, Text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
 from passlib.context import CryptContext
@@ -47,6 +47,21 @@ class SubscriptionPlan(enum.Enum):
     BASIC = "basic"          # 20 users, 5,000 chats/month
     PREMIUM = "premium"      # 50 users, 25,000 chats/month
     ENTERPRISE = "enterprise"  # Unlimited
+
+
+class UserStatus(enum.Enum):
+    """User online status for messaging"""
+    ONLINE = "online"
+    AWAY = "away"
+    OFFLINE = "offline"
+
+
+class MessageType(enum.Enum):
+    """Message type enumeration"""
+    TEXT = "text"
+    IMAGE = "image"
+    FILE = "file"
+    SYSTEM = "system"
 
 
 class Organization(Base):
@@ -135,6 +150,8 @@ class User(Base):
     # Relationships
     organization = relationship("Organization", back_populates="users")
     chat_sessions = relationship("ChatSession", back_populates="user")
+    sent_messages = relationship("Message", foreign_keys="Message.sender_id")
+    conversation_participations = relationship("ConversationParticipant")
 
     def verify_password(self, password: str) -> bool:
         """Verify password against hash"""
@@ -183,6 +200,125 @@ class ChatSession(Base):
     # Relationships
     user = relationship("User", back_populates="chat_sessions")
     organization = relationship("Organization", back_populates="chat_sessions")
+
+
+class UserPresence(Base):
+    """User presence tracking for real-time messaging"""
+    __tablename__ = "user_presence"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), index=True, nullable=False)
+    
+    # Presence data
+    status = Column(Enum(UserStatus), default=UserStatus.OFFLINE, nullable=False)
+    last_seen = Column(DateTime, default=datetime.utcnow)
+    is_typing = Column(Boolean, default=False)
+    typing_in_conversation = Column(Integer, nullable=True)  # conversation_id if typing
+    
+    # Connection tracking
+    socket_id = Column(String, nullable=True)  # For WebSocket connection tracking
+    
+    # Timestamps
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+    organization = relationship("Organization")
+    
+    # Ensure one presence record per user per organization
+    __table_args__ = (UniqueConstraint('user_id', 'organization_id', name='_user_org_presence_uc'),)
+
+
+class Conversation(Base):
+    """Conversation between users in an organization"""
+    __tablename__ = "conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), index=True, nullable=False)
+    
+    # Conversation metadata
+    name = Column(String, nullable=True)  # Optional conversation name for group chats
+    is_group = Column(Boolean, default=False)  # True for group conversations
+    
+    # Last activity tracking
+    last_message_id = Column(Integer, nullable=True)
+    last_activity = Column(DateTime, default=datetime.utcnow)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    organization = relationship("Organization")
+    participants = relationship("ConversationParticipant", back_populates="conversation")
+    messages = relationship("Message", back_populates="conversation", order_by="Message.created_at")
+
+
+class ConversationParticipant(Base):
+    """Participants in a conversation"""
+    __tablename__ = "conversation_participants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    
+    # Participant metadata
+    joined_at = Column(DateTime, default=datetime.utcnow)
+    last_read_message_id = Column(Integer, nullable=True)  # For unread count
+    is_active = Column(Boolean, default=True)  # Can leave/rejoin conversations
+    
+    # Notifications
+    muted = Column(Boolean, default=False)
+    
+    # Timestamps
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    conversation = relationship("Conversation", back_populates="participants")
+    user = relationship("User")
+    
+    # Ensure unique participant per conversation
+    __table_args__ = (UniqueConstraint('conversation_id', 'user_id', name='_conversation_user_uc'),)
+
+
+class Message(Base):
+    """Individual messages in conversations"""
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), index=True, nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    
+    # Message content
+    content = Column(Text, nullable=False)
+    message_type = Column(Enum(MessageType), default=MessageType.TEXT, nullable=False)
+    
+    # File/media metadata (if applicable)
+    file_url = Column(String, nullable=True)
+    file_name = Column(String, nullable=True)
+    file_size = Column(Integer, nullable=True)
+    file_type = Column(String, nullable=True)
+    
+    # Message metadata
+    edited = Column(Boolean, default=False)
+    edited_at = Column(DateTime, nullable=True)
+    
+    # Threading (for replies)
+    reply_to_message_id = Column(Integer, ForeignKey("messages.id"), nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    conversation = relationship("Conversation", back_populates="messages")
+    sender = relationship("User")
+    reply_to = relationship("Message", remote_side=[id])  # Self-referential for replies
+    
+    # Index for efficient message retrieval
+    __table_args__ = (
+        {'extend_existing': True}
+    )
 
 
 def get_db():

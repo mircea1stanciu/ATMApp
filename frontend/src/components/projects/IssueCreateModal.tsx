@@ -46,7 +46,7 @@ export default function IssueCreateModal({ projectId, initialStatus, onClose, on
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:8000/api/projects/${projectId}/issues`,
+        `http://localhost:8001/api/projects/${projectId}/issues`,
         {
           method: 'POST',
           headers: {

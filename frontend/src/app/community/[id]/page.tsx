@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import Header from '../../../components/Header'
 import CommunityDashboard from '../../../components/CommunityDashboard'
 import ProjectsPage from '../../../components/projects/ProjectsPage'
+import PersistentChatSidebar from '../../../components/PersistentChatSidebar'
 import { useChat } from '../../../contexts/ChatContext'
 
 const communityData = {
@@ -384,10 +385,10 @@ export default function CommunityPage() {
 
   // Listen for request to open chat
   useEffect(() => {
-    const handler = () => openChat();
+    const handler = () => openChat(communityId);
     const chatWithQueryHandler = (e: any) => {
       if (e.detail?.query) {
-        openChat();
+        openChat(communityId);
       }
     };
     
@@ -545,7 +546,7 @@ export default function CommunityPage() {
             <div className="flex items-center gap-2 sm:gap-3">
               {/* AI Assistant Button */}
               <button
-                onClick={() => openChat()}
+                onClick={() => openChat(communityId)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
                 title="Open AI Assistant"
               >
@@ -597,8 +598,7 @@ export default function CommunityPage() {
         {/* Floating Chat Button */}
         <button
           onClick={() => {
-            setActiveCommunityId(communityId);
-            openChat();
+            openChat(communityId);
           }}
           className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-40"
           title="Open AI Assistant"
@@ -608,6 +608,9 @@ export default function CommunityPage() {
           </svg>
           <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
         </button>
+
+        {/* Chat Sidebar - Only visible in community pages */}
+        <PersistentChatSidebar />
       </div>
     </div>
   )

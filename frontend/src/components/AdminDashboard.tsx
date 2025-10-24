@@ -102,7 +102,7 @@ export default function AdminDashboard() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/auth/me', {
+      const response = await fetch('http://localhost:8001/api/auth/me', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -149,7 +149,7 @@ export default function AdminDashboard() {
       ...options.headers
     };
 
-    const response = await fetch(`http://localhost:8000${endpoint}`, {
+    const response = await fetch(`http://localhost:8001${endpoint}`, {
       ...options,
       headers
     });
@@ -375,7 +375,7 @@ export default function AdminDashboard() {
       }
       
       try {
-        const response = await fetch('http://localhost:8000/api/auth/register-org-admin', {
+        const response = await fetch('http://localhost:8001/api/auth/register-org-admin', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -427,7 +427,7 @@ export default function AdminDashboard() {
       }
       
       try {
-        const response = await fetch('http://localhost:8000/api/auth/register-user', {
+        const response = await fetch('http://localhost:8001/api/auth/register-user', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1140,7 +1140,7 @@ export default function AdminDashboard() {
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">📍 Base URL</h3>
                 <div className="bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 rounded-lg font-mono text-xs sm:text-sm">
-                  <code className="text-blue-600 dark:text-blue-400">http://localhost:8000</code>
+                  <code className="text-blue-600 dark:text-blue-400">http://localhost:8001</code>
                 </div>
                 <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   All API endpoints are relative to this base URL
@@ -1367,7 +1367,7 @@ export default function AdminDashboard() {
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">🧪 Quick Links</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   <a
-                    href="http://localhost:8000/docs"
+                    href="http://localhost:8001/docs"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all"
@@ -1379,7 +1379,7 @@ export default function AdminDashboard() {
                     </div>
                   </a>
                   <a
-                    href="http://localhost:8000/redoc"
+                    href="http://localhost:8001/redoc"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all"

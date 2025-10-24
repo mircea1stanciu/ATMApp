@@ -106,7 +106,7 @@ Authorization: Bearer <your_jwt_token>
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Frontend URLs
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003"],  # Frontend URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -114,6 +114,10 @@ app.add_middleware(
 
 # Include routers
 app.include_router(project_routes.router)
+
+# Import and include messaging routes
+from messaging_routes import router as messaging_router
+app.include_router(messaging_router)
 
 # Global agent instances - One for each community
 # Global agent instances - One for each community

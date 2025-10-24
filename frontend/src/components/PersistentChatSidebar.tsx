@@ -5,6 +5,7 @@ import { marked } from 'marked';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 import { useChat } from '../contexts/ChatContext';
+import MessengerView from './MessengerView';
 
 interface Message {
   id: string;
@@ -143,7 +144,7 @@ const communityData = {
 };
 
 export default function PersistentChatSidebar() {
-  const { isOpen, closeChat, activeCommunityId, setActiveCommunityId } = useChat();
+  const { isOpen, closeChat, activeCommunityId, setActiveCommunityId, activeTab, setActiveTab } = useChat();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -168,6 +169,9 @@ export default function PersistentChatSidebar() {
 
   // Get community data based on active community
   const community = activeCommunityId ? communityData[activeCommunityId as keyof typeof communityData] : null;
+
+  // Show chat if it's open and either messenger tab or AI tab
+  const shouldShowChat = isOpen;
 
 
 
@@ -285,8 +289,8 @@ export default function PersistentChatSidebar() {
     return null;
   }
 
-  // Don't render if chat is closed or no community
-  if (!isOpen || !community) {
+  // Don't render if chat is closed or conditions not met
+  if (!shouldShowChat) {
     return null;
   }
 
@@ -309,8 +313,8 @@ export default function PersistentChatSidebar() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.003 9.003 0 01-8.716-6.747M3 12c0-4.418 4.03-8 9-8a8.997 8.997 0 018.716 6.747M21 12H3" />
               </svg>
             </button>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${community.color} text-white mb-2`}>
-              {community.icon}
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-blue-500 text-white mb-2">
+              {activeTab === 'ai' ? (community?.icon || '🤖') : '💬'}
             </div>
             <button
               onClick={closeChat}
@@ -328,182 +332,234 @@ export default function PersistentChatSidebar() {
         {!isCollapsed && (
           <div className="h-full flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${community.color} text-white`}>
-                  {community.icon}
-                </div>
-                <div>
-                  <h2 className="font-semibold text-gray-900 dark:text-white text-sm">
-                    {community.agent}
-                  </h2>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    {community.name}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setIsCollapsed(true)}
-                  className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  title="Minimize chat"
-                >
-                  <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                  </svg>
-                </button>
-                <button
-                  onClick={closeChat}
-                  className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  title="Close chat"
-                >
-                  <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="flex items-center gap-2 p-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <button
-                onClick={() => setShowExamples(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-xs font-medium"
-              >
-                <span>💡</span>
-                <span>Examples</span>
-              </button>
-              <button
-                onClick={clearConversation}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-xs font-medium"
-              >
-                <span>🗑️</span>
-                <span>Clear</span>
-              </button>
-            </div>
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center px-4">
-                    <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center text-3xl ${community.color} text-white`}>
-                      {community.icon}
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                      How can I help?
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      Ask me anything about {community.name.toLowerCase()}
-                    </p>
-                    <button
-                      onClick={() => setShowExamples(true)}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      View example questions →
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex gap-2 ${
-                        message.sender === 'user' ? 'justify-end' : 'justify-start'
-                      }`}
-                    >
-                      {message.sender === 'agent' && (
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${community.color} text-white flex-shrink-0 mt-1`}>
-                          {community.icon}
-                        </div>
-                      )}
-
-                      <div
-                        className={`max-w-[85%] rounded-lg px-3 py-2 ${
-                          message.sender === 'user'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                        }`}
-                      >
-                        <div
-                          className={`prose prose-sm max-w-none ${
-                            message.sender === 'user'
-                              ? 'prose-invert'
-                              : 'dark:prose-invert'
-                          }`}
-                          dangerouslySetInnerHTML={formatMessage(message.content)}
-                        />
-                        {message.timestamp && (
-                          <div className={`text-xs mt-1 ${
-                            message.sender === 'user' ? 'opacity-70' : 'opacity-50'
-                          }`}>
-                            {formatTimestamp(message.timestamp)}
-                          </div>
-                        )}
-                      </div>
-
-                      {message.sender === 'user' && (
-                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0 mt-1">
-                          👤
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Loading Indicator */}
-              {isLoading && (
-                <div className="flex items-start gap-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${community.color} text-white`}>
-                    {community.icon}
-                  </div>
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                      </div>
-                      <span className="text-xs text-gray-600 dark:text-gray-400">Thinking...</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input Area */}
-            <div className="border-t border-gray-200 dark:border-gray-700 p-4">
-              <form onSubmit={handleSubmit}>
-                <div className="flex gap-2">
-                  <textarea
-                    ref={textareaRef}
-                    value={inputValue}
-                    onChange={autoResizeTextarea}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Ask me anything..."
-                    className="flex-1 resize-none border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm min-h-[40px] max-h-[120px]"
-                    rows={1}
-                  />
+            <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+              {/* Tab Navigation */}
+              <div className="flex items-center justify-between p-4 pb-2">
+                <div className="flex space-x-1">
                   <button
-                    type="submit"
-                    disabled={!inputValue.trim() || isLoading}
-                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm flex items-center gap-1"
+                    onClick={() => setActiveTab('ai')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      activeTab === 'ai'
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
                   >
-                    <span>↑</span>
+                    🤖 AI Assistant
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('messenger')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      activeTab === 'messenger'
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    💬 Messenger
                   </button>
                 </div>
-              </form>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setIsCollapsed(true)}
+                    className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    title="Minimize chat"
+                  >
+                    <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={closeChat}
+                    className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    title="Close chat"
+                  >
+                    <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* AI Assistant Header (when AI tab is active) */}
+              {activeTab === 'ai' && community && (
+                <div className="flex items-center gap-3 px-4 pb-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-lg ${community.color} text-white`}>
+                    {community.icon}
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-gray-900 dark:text-white text-sm">
+                      {community.agent}
+                    </h2>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      {community.name}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900">
+              {activeTab === 'messenger' ? (
+                <MessengerView />
+              ) : activeTab === 'ai' && community ? (
+                <>
+                  {/* Quick Actions */}
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <button
+                      onClick={() => setShowExamples(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-xs font-medium"
+                    >
+                      <span>💡</span>
+                      <span>Examples</span>
+                    </button>
+                    <button
+                      onClick={clearConversation}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-xs font-medium"
+                    >
+                      <span>🗑️</span>
+                      <span>Clear</span>
+                    </button>
+                  </div>
+
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
+                    {messages.length === 0 ? (
+                      <div className="h-full flex items-center justify-center">
+                        <div className="text-center px-4">
+                          <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center text-3xl ${community.color} text-white`}>
+                            {community.icon}
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                            How can I help?
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Ask me anything about {community.name.toLowerCase()}
+                          </p>
+                          <button
+                            onClick={() => setShowExamples(true)}
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            View example questions →
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {messages.map((message) => (
+                          <div
+                            key={message.id}
+                            className={`flex gap-2 ${
+                              message.sender === 'user' ? 'justify-end' : 'justify-start'
+                            }`}
+                          >
+                            {message.sender === 'agent' && (
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${community.color} text-white flex-shrink-0 mt-1`}>
+                                {community.icon}
+                              </div>
+                            )}
+
+                            <div
+                              className={`max-w-[85%] rounded-lg px-3 py-2 ${
+                                message.sender === 'user'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                              }`}
+                            >
+                              <div
+                                className={`prose prose-sm max-w-none ${
+                                  message.sender === 'user'
+                                    ? 'prose-invert'
+                                    : 'dark:prose-invert'
+                                }`}
+                                dangerouslySetInnerHTML={formatMessage(message.content)}
+                              />
+                              {message.timestamp && (
+                                <div className={`text-xs mt-1 ${
+                                  message.sender === 'user' ? 'opacity-70' : 'opacity-50'
+                                }`}>
+                                  {formatTimestamp(message.timestamp)}
+                                </div>
+                              )}
+                            </div>
+
+                            {message.sender === 'user' && (
+                              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0 mt-1">
+                                👤
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Loading Indicator */}
+                    {isLoading && (
+                      <div className="flex items-start gap-2">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${community.color} text-white`}>
+                          {community.icon}
+                        </div>
+                        <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex space-x-1">
+                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">Thinking...</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div ref={messagesEndRef} />
+                  </div>
+
+                  {/* Input Area */}
+                  <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+                    <form onSubmit={handleSubmit}>
+                      <div className="flex gap-2">
+                        <textarea
+                          ref={textareaRef}
+                          value={inputValue}
+                          onChange={autoResizeTextarea}
+                          onKeyDown={handleKeyDown}
+                          placeholder="Ask me anything..."
+                          className="flex-1 resize-none border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm min-h-[40px] max-h-[120px]"
+                          rows={1}
+                        />
+                        <button
+                          type="submit"
+                          disabled={!inputValue.trim() || isLoading}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm flex items-center gap-1"
+                        >
+                          <span>↑</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center px-4">
+                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="text-2xl">🤖</span>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      Select a Community
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Choose a community to start chatting with an AI assistant
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
 
       {/* Examples Modal */}
-      {showExamples && (
+      {showExamples && community && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">

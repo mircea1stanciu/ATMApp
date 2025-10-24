@@ -2,13 +2,17 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
+type ChatTab = 'ai' | 'messenger';
+
 interface ChatContextType {
   isOpen: boolean;
-  openChat: () => void;
+  openChat: (communityId?: string) => void;
   closeChat: () => void;
   toggleChat: () => void;
   activeCommunityId: string | null;
   setActiveCommunityId: (id: string | null) => void;
+  activeTab: ChatTab;
+  setActiveTab: (tab: ChatTab) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -16,6 +20,7 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeCommunityId, setActiveCommunityId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ChatTab>('ai');
   const [isClient, setIsClient] = useState(false);
 
   // Ensure we're on the client side
@@ -30,9 +35,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const savedState = localStorage.getItem('chatState');
     if (savedState) {
       try {
-        const { isOpen: savedIsOpen, activeCommunityId: savedCommunityId } = JSON.parse(savedState);
+        const { 
+          isOpen: savedIsOpen, 
+          activeCommunityId: savedCommunityId,
+          activeTab: savedActiveTab
+        } = JSON.parse(savedState);
         setIsOpen(savedIsOpen || false);
         setActiveCommunityId(savedCommunityId || null);
+        setActiveTab(savedActiveTab || 'ai');
       } catch (e) {
         console.error('Error loading chat state:', e);
       }
@@ -47,11 +57,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     
     localStorage.setItem('chatState', JSON.stringify({
       isOpen,
-      activeCommunityId
+      activeCommunityId,
+      activeTab
     }));
-  }, [isClient, isOpen, activeCommunityId]);
+  }, [isClient, isOpen, activeCommunityId, activeTab]);
 
-  const openChat = () => setIsOpen(true);
+  const openChat = (communityId?: string) => {
+    setIsOpen(true);
+    if (communityId) {
+      setActiveCommunityId(communityId);
+      setActiveTab('ai'); // Default to AI tab when opening from community
+    }
+  };
   const closeChat = () => setIsOpen(false);
   const toggleChat = () => setIsOpen(prev => !prev);
 
@@ -63,7 +80,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         closeChat,
         toggleChat,
         activeCommunityId,
-        setActiveCommunityId
+        setActiveCommunityId,
+        activeTab,
+        setActiveTab
       }}
     >
       {children}
