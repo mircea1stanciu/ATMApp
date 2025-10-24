@@ -7,7 +7,7 @@ import os
 from typing import Dict, List, Optional
 from enum import Enum
 from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
+# from langchain_anthropic import ChatAnthropic
 
 
 class AIProvider(str, Enum):
@@ -204,14 +204,7 @@ class ModelManager:
             )
         
         elif model_config.provider == AIProvider.ANTHROPIC:
-            if not os.getenv("ANTHROPIC_API_KEY"):
-                raise ValueError("ANTHROPIC_API_KEY not set")
-            
-            return ChatAnthropic(
-                model=model_config.model_name,
-                temperature=temp,
-                max_tokens=model_config.max_tokens
-            )
+            raise ValueError("Anthropic support temporarily disabled - use OpenAI instead")
         
         else:
             raise ValueError(f"Unsupported provider: {model_config.provider}")

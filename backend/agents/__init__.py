@@ -1,19 +1,19 @@
 # Agents package for UnifiedWork
 
-from agents.qa_agent import QAAgent
-from agents.backend_agent import BackendAgent
-from agents.frontend_agent import FrontendAgent
-from agents.design_agent import DesignAgent
-from agents.product_agent import ProductAgent
-from agents.devops_agent import DevOpsAgent
-from agents.docs_agent import DocsAgent
+from agents.simple_qa_agent import SimpleQAAgent
+from agents.simple_backend_agent import SimpleBackendAgent
+from agents.simple_frontend_agent import SimpleFrontendAgent
+from agents.simple_design_agent import SimpleDesignAgent
+from agents.simple_product_agent import SimpleProductAgent
+from agents.simple_devops_agent import SimpleDevOpsAgent
+from agents.simple_analyst_agent import SimpleAnalystAgent
 
 __all__ = [
-    'QAAgent',
-    'BackendAgent', 
-    'FrontendAgent',
-    'DesignAgent',
-    'ProductAgent',
-    'DevOpsAgent',
-    'DocsAgent'
+    'SimpleQAAgent',
+    'SimpleBackendAgent', 
+    'SimpleFrontendAgent',
+    'SimpleDesignAgent',
+    'SimpleProductAgent',
+    'SimpleDevOpsAgent',
+    'SimpleAnalystAgent'
 ]

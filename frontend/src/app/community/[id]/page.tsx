@@ -5,8 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { notFound } from 'next/navigation'
 import Header from '../../../components/Header'
 import CommunityDashboard from '../../../components/CommunityDashboard'
-import SideChatPanel from '../../../components/SideChatPanel'
 import ProjectsPage from '../../../components/projects/ProjectsPage'
+import { useChat } from '../../../contexts/ChatContext'
 
 const communityData = {
   qa: {
@@ -335,9 +335,18 @@ export default function CommunityPage() {
   const [hasAccess, setHasAccess] = useState<boolean | null>(null)
   const [user, setUser] = useState<any>(null)
   const [activeView, setActiveView] = useState<'dashboard' | 'projects'>('dashboard')
-  const [isChatOpen, setIsChatOpen] = useState(false)
+  const { isOpen: isChatOpen, openChat, closeChat, setActiveCommunityId } = useChat()
   
   const community = communityData[communityId as keyof typeof communityData]
+  
+  // Set active community for chat context
+  useEffect(() => {
+    console.log('Community page - communityId:', communityId);
+    if (communityId) {
+      console.log('Community page - calling setActiveCommunityId with:', communityId);
+      setActiveCommunityId(communityId)
+    }
+  }, [communityId, setActiveCommunityId])
   
   useEffect(() => {
     // Check if user has access to this community
@@ -375,10 +384,10 @@ export default function CommunityPage() {
 
   // Listen for request to open chat
   useEffect(() => {
-    const handler = () => setIsChatOpen(true);
+    const handler = () => openChat();
     const chatWithQueryHandler = (e: any) => {
       if (e.detail?.query) {
-        setIsChatOpen(true);
+        openChat();
       }
     };
     
@@ -536,7 +545,7 @@ export default function CommunityPage() {
             <div className="flex items-center gap-2 sm:gap-3">
               {/* AI Assistant Button */}
               <button
-                onClick={() => setIsChatOpen(true)}
+                onClick={() => openChat()}
                 className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
                 title="Open AI Assistant"
               >
@@ -583,50 +592,14 @@ export default function CommunityPage() {
           </div>
         </div>
 
-        {/* Floating Chat Pop-up */}
-        {isChatOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col">
-              {/* Chat Header */}
-              <div className={`${community.color} text-white p-4 rounded-t-xl flex items-center justify-between`}>
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{community.icon}</span>
-                  <div>
-                    <h3 className="font-semibold text-lg">{community.name} - AI Assistant</h3>
-                    <p className="text-sm text-white/80">Ask me anything about {community.name.toLowerCase()}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsChatOpen(false)}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                  title="Close chat"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Chat Content */}
-              <div className="flex-1 overflow-hidden">
-                <SideChatPanel
-                  communityId={communityId}
-                  communityName={community.name}
-                  communityIcon={community.icon}
-                  communityColor={community.color}
-                  capabilities={community.capabilities}
-                  examples={community.examples}
-                  isOpen={isChatOpen}
-                  onClose={() => setIsChatOpen(false)}
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Chat is now handled by the global PersistentChatSidebar component */}
 
         {/* Floating Chat Button */}
         <button
-          onClick={() => setIsChatOpen(true)}
+          onClick={() => {
+            setActiveCommunityId(communityId);
+            openChat();
+          }}
           className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-40"
           title="Open AI Assistant"
         >

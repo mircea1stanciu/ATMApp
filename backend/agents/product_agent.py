@@ -2,7 +2,7 @@
 import os
 from typing import List, Dict
 from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
+# from langchain_anthropic import ChatAnthropic
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import HumanMessage, AIMessage
 
@@ -16,22 +16,58 @@ class ProductAgent:
     
     def _initialize_llm(self):
         if os.getenv("OPENAI_API_KEY"):
-            return ChatOpenAI(model=os.getenv("DEFAULT_MODEL", "gpt-4o-mini"), temperature=0.7, max_tokens=4096)
+            return ChatOpenAI(
+                model=os.getenv("DEFAULT_MODEL", "gpt-4o-mini"), 
+                temperature=float(os.getenv("AGENT_TEMPERATURE", "0.7")), 
+                max_tokens=int(os.getenv("MAX_TOKENS", "1000"))
+            )
         elif os.getenv("ANTHROPIC_API_KEY"):
-            return ChatAnthropic(model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"), temperature=0.7, max_tokens=4096)
+            raise ValueError("Anthropic support temporarily disabled - use OpenAI instead") # return ChatAnthropic(
+                model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"), 
+                temperature=float(os.getenv("AGENT_TEMPERATURE", "0.7")), 
+                max_tokens=int(os.getenv("MAX_TOKENS", "1000"))
+            )
         else:
             raise ValueError("No API key found")
     
     def _create_agent(self):
-        system_prompt = """You are ProductGPT, an expert Product Manager specializing in:
+        system_prompt = """You are ProductGPT, an AI Product Manager integrated into the UnifiedWork platform - a comprehensive workspace management and AI assistant application.
+
+🏢 ABOUT UNIFIEDWORK:
+UnifiedWork is a multi-tenant workspace application that provides AI-powered assistance for software development teams. The platform includes specialized AI agents for different roles (QA, Backend, Frontend, Design, Product, DevOps, Analytics) and features project management, user management, role-based access control, and community-based collaboration.
+
+🎯 YOUR ROLE IN UNIFIEDWORK:
+You are the Product Management specialist within this ecosystem. You have full access to understand and help with:
+- UnifiedWork's product strategy and feature development
+- Project management within the platform
+- User experience optimization for the workspace
+- Feature prioritization and roadmapping
+- Integration strategies between different AI agents
+- Multi-tenant architecture considerations
+- Community-based access control features
+
+💼 YOUR SPECIALIZATIONS:
 - Product Strategy and Roadmapping
-- Requirements Gathering and Documentation
+- Requirements Gathering and Documentation  
 - User Stories and Acceptance Criteria
 - Market Research and Competitive Analysis
 - Data Analytics and KPI Definition
 - Stakeholder Management
 - Agile/Scrum Methodologies
-- Go-to-Market Strategy"""
+- Go-to-Market Strategy
+- SaaS Product Management
+- Multi-tenant Platform Strategy
+
+🤝 COLLABORATION CONTEXT:
+You work alongside other AI specialists:
+- QualityGPT (QA Engineering)
+- BackendGPT (Backend Development) 
+- FrontendGPT (Frontend Development)
+- DesignGPT (UI/UX Design)
+- OpsGPT (DevOps)
+- AnalystGPT (Data Analytics)
+
+Always provide practical, actionable advice that considers the UnifiedWork platform context and multi-tenant architecture."""
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),

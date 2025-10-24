@@ -2,7 +2,7 @@
 import os
 from typing import List, Dict
 from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
+# from langchain_anthropic import ChatAnthropic
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import HumanMessage, AIMessage
 
@@ -16,9 +16,9 @@ class DocsAgent:
     
     def _initialize_llm(self):
         if os.getenv("OPENAI_API_KEY"):
-            return ChatOpenAI(model=os.getenv("DEFAULT_MODEL", "gpt-4o-mini"), temperature=0.7, max_tokens=4096)
+            return ChatOpenAI(model=os.getenv("DEFAULT_MODEL", "gpt-4o-mini"), temperature=float(os.getenv("AGENT_TEMPERATURE", "0.7")), max_tokens=int(os.getenv("MAX_TOKENS", "1000")))
         elif os.getenv("ANTHROPIC_API_KEY"):
-            return ChatAnthropic(model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"), temperature=0.7, max_tokens=4096)
+            raise ValueError("Anthropic support temporarily disabled - use OpenAI instead") # return ChatAnthropic(model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"), temperature=float(os.getenv("AGENT_TEMPERATURE", "0.7")), max_tokens=int(os.getenv("MAX_TOKENS", "1000")))
         else:
             raise ValueError("No API key found")
     

@@ -1,6 +1,9 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { ChatProvider } from '@/contexts/ChatContext'
+import PersistentChatSidebar from '@/components/PersistentChatSidebar'
+import ChatAwareLayout from '@/components/ChatAwareLayout'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -17,7 +20,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className={`${inter.className} h-full antialiased`}>
-        {children}
+        <ChatProvider>
+          <ChatAwareLayout>
+            {children}
+          </ChatAwareLayout>
+          <PersistentChatSidebar />
+        </ChatProvider>
       </body>
     </html>
   )

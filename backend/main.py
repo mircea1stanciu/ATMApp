@@ -25,17 +25,37 @@ from core.auth import (
     get_community_lead_user,
     get_super_admin_user
 )
-from agents.qa_agent import QAAgent
-from agents.backend_agent import BackendAgent
-from agents.frontend_agent import FrontendAgent
-from agents.design_agent import DesignAgent
-from agents.product_agent import ProductAgent
-from agents.devops_agent import DevOpsAgent
-from agents.docs_agent import DocsAgent
+from agents.simple_qa_agent import SimpleQAAgent
+from agents.simple_backend_agent import SimpleBackendAgent
+from agents.simple_frontend_agent import SimpleFrontendAgent
+from agents.simple_design_agent import SimpleDesignAgent
+from agents.simple_product_agent import SimpleProductAgent
+from agents.simple_devops_agent import SimpleDevOpsAgent
+from agents.simple_analyst_agent import SimpleAnalystAgent
 from api import project_routes
 
 # Load environment variables
 load_dotenv()
+
+# Helper function for community access control
+def check_community_access(user: User, community_id: str):
+    """Check if user has access to a specific community within their organization"""
+    
+    # Super admins and org admins have access to all communities
+    if user.role in [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN]:
+        return True
+    
+    # Regular users and community leads must have community assigned
+    import json
+    assigned_communities = json.loads(user.assigned_communities) if user.assigned_communities else []
+    
+    if community_id not in assigned_communities:
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Access denied. You are not assigned to the {community_id} community. Contact your organization administrator for access."
+        )
+    
+    return True
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -121,13 +141,13 @@ async def startup_event():
     
     # Initialize all AI agents
     try:
-        agents["qa"] = QAAgent()
-        agents["backend"] = BackendAgent()
-        agents["frontend"] = FrontendAgent()
-        agents["design"] = DesignAgent()
-        agents["product"] = ProductAgent()
-        agents["devops"] = DevOpsAgent()
-        agents["analyst"] = DocsAgent()  # Renamed to analyst, using DocsAgent for now
+        agents["qa"] = SimpleQAAgent()
+        agents["backend"] = SimpleBackendAgent()
+        agents["frontend"] = SimpleFrontendAgent()
+        agents["design"] = SimpleDesignAgent()
+        agents["product"] = SimpleProductAgent()
+        agents["devops"] = SimpleDevOpsAgent()
+        agents["analyst"] = SimpleAnalystAgent()
         print("✅ All AI Agents initialized successfully")
     except Exception as e:
         print(f"❌ Failed to initialize agents: {e}")
@@ -492,6 +512,7 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
 async def community_chat(
     community_id: str,
     chat_message: ChatMessage,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -501,6 +522,9 @@ async def community_chat(
     valid_communities = ["qa", "backend", "frontend", "design", "product", "devops", "docs"]
     if community_id not in valid_communities:
         raise HTTPException(status_code=404, detail="Community not found")
+    
+    # Check community access control
+    check_community_access(current_user, community_id)
     
     # Get agent for community
     agent = agents.get(community_id)
@@ -521,20 +545,6 @@ async def community_chat(
                 )
     
     try:
-        # Process message with appropriate agent
-        response = agent.process_query(chat_message.message)
-        
-        # Save to database
-        chat_session = ChatSession(
-            user_id=current_user.id,
-            organization_id=current_user.organization_id,
-            community=community_id,
-            message=chat_message.message,
-            response=response
-        )
-        db.add(chat_session)
-        db.commit()
-        
         # Map community to agent name
         agent_names = {
             "qa": "QualityGPT",
@@ -545,6 +555,28 @@ async def community_chat(
             "devops": "OpsGPT",
             "analyst": "AnalystGPT"  # Changed from "docs": "DocsGPT"
         }
+        
+        # Extract auth token from request headers
+        auth_header = request.headers.get("Authorization", "")
+        auth_token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+        
+        # Process message with appropriate agent (pass token if agent supports it)
+        if hasattr(agent, 'process_query') and 'auth_token' in agent.process_query.__code__.co_varnames:
+            response = agent.process_query(chat_message.message, auth_token=auth_token)
+        else:
+            response = agent.process_query(chat_message.message)
+        
+        # Save to database
+        chat_session = ChatSession(
+            user_id=current_user.id,
+            organization_id=current_user.organization_id,
+            community=community_id,
+            agent_name=agent_names.get(community_id, f"{community_id.title()}GPT"),
+            message=chat_message.message,
+            response=response
+        )
+        db.add(chat_session)
+        db.commit()
         
         return ChatResponse(
             response=response,
@@ -669,8 +701,14 @@ async def get_user_preferences(
 
 # Get community examples
 @app.get("/api/communities/{community_id}/examples", tags=["Communities"])
-async def get_community_examples(community_id: str):
+async def get_community_examples(
+    community_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """Get example queries for specific community"""
+    
+    # Check community access control
+    check_community_access(current_user, community_id)
     
     examples_data = {
         "qa": {

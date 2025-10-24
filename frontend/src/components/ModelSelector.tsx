@@ -194,7 +194,7 @@ export default function ModelSelector({ onModelSelect, currentModel }: ModelSele
         'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
       }`}>
         <Sparkles className="w-3 h-3" />
-        {subscription.toUpperCase()} Plan
+        {subscription?.toUpperCase() || 'FREE'} Plan
       </div>
 
       {/* Model Cards */}
