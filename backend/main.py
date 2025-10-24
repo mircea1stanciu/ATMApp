@@ -152,7 +152,7 @@ class TokenResponse(BaseModel):
 
 class ChatMessage(BaseModel):
     message: str
-    community: str  # qa, backend, frontend, design, product, devops, docs
+    community: Optional[str] = None  # Optional since community_id is in URL path
 
 class ChatResponse(BaseModel):
     response: str
