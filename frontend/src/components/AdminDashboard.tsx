@@ -773,9 +773,24 @@ export default function AdminDashboard() {
                 {activeSection === 'users' && (currentUser?.role === 'org_admin' ? 'Organization Users' : 'Users Management')}
                 {activeSection === 'api-docs' && 'API Documentation'}
               </h1>
-              <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400 mt-0.5">
-                {currentUser?.role === 'org_admin' ? 'Manage your organization' : 'Manage your multi-tenant platform'}
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                  {currentUser?.role === 'org_admin' ? 'Manage your organization' : 'Manage your multi-tenant platform'}
+                </p>
+                {currentUser?.role === 'org_admin' && activeSection === 'users' && currentUser?.organization?.slug && (
+                  <div className="group relative">
+                    <code className="text-[10px] sm:text-xs font-mono bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded border border-blue-200 dark:border-blue-700 cursor-help">
+                      {currentUser.organization.slug}
+                    </code>
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
+                      <div className="bg-gray-900 dark:bg-gray-950 text-white text-xs rounded py-2 px-3 whitespace-nowrap shadow-lg">
+                        Slug for user creation
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900 dark:border-t-gray-950"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               {/* Responsive Breakpoint Indicator - Remove after testing */}
