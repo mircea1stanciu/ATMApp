@@ -469,13 +469,28 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
     ).first():
         raise HTTPException(status_code=400, detail="Username already taken in this organization")
     
+    # Determine user role (default to USER)
+    user_role = UserRole.USER
+    assigned_communities = None
+    
+    if register_data.get("role"):
+        role_value = register_data["role"].upper()
+        if role_value in ["USER", "COMMUNITY_LEAD"]:
+            user_role = UserRole[role_value]
+    
+    # Handle community assignments for community leads and regular users
+    if (user_role == UserRole.COMMUNITY_LEAD or user_role == UserRole.USER) and register_data.get("assigned_communities"):
+        import json
+        assigned_communities = json.dumps(register_data["assigned_communities"])
+    
     # Create regular user
     new_user = User(
         username=register_data["username"],
         email=register_data["email"],
         hashed_password=User.hash_password(register_data["password"]),
         full_name=register_data["full_name"],
-        role=UserRole.USER,
+        role=user_role,
+        assigned_communities=assigned_communities,
         organization_id=org.id,
         is_active=True
     )
@@ -485,6 +500,7 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
     db.refresh(new_user)
     
     # Create JWT token
+    import json
     access_token = create_access_token(
         data={
             "user_id": new_user.id,
@@ -503,6 +519,7 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
             "email": new_user.email,
             "full_name": new_user.full_name,
             "role": new_user.role.value,
+            "assigned_communities": json.loads(new_user.assigned_communities) if new_user.assigned_communities else [],
             "organization": {
                 "id": org.id,
                 "name": org.name,
