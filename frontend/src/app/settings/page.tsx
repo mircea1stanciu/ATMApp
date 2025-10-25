@@ -2,20 +2,31 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Settings, User, Moon, Sun, Sparkles, ArrowLeft } from 'lucide-react';
+import { Settings, User, Moon, Sun, Sparkles, ArrowLeft, Mail, MapPin, Briefcase, Edit2, Save, X } from 'lucide-react';
 import ModelSelector from '@/components/ModelSelector';
 
 interface UserData {
   id: number;
   role: string;
   username: string;
+  email?: string;
+  full_name?: string;
+  organization?: {
+    name: string;
+  };
 }
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'general' | 'ai-models' | 'account'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'ai-models' | 'profile'>('general');
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileData, setProfileData] = useState({
+    full_name: '',
+    email: '',
+  });
+  const [savedMessage, setSavedMessage] = useState('');
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -23,6 +34,10 @@ export default function SettingsPage() {
       try {
         const userData = JSON.parse(userStr);
         setUser(userData);
+        setProfileData({
+          full_name: userData.full_name || '',
+          email: userData.email || '',
+        });
         
         // Set default tab based on user role
         const allowedRoles = ['super_admin', 'org_admin', 'community_lead'];
@@ -43,6 +58,31 @@ export default function SettingsPage() {
     }
     setLoading(false);
   }, [router]);
+
+  const handleProfileUpdate = () => {
+    if (user) {
+      const updatedUser = {
+        ...user,
+        full_name: profileData.full_name,
+        email: profileData.email,
+      };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setIsEditingProfile(false);
+      setSavedMessage('Profile updated successfully!');
+      setTimeout(() => setSavedMessage(''), 3000);
+    }
+  };
+
+  const handleCancel = () => {
+    if (user) {
+      setProfileData({
+        full_name: user.full_name || '',
+        email: user.email || '',
+      });
+    }
+    setIsEditingProfile(false);
+  };
 
   if (loading || !user) {
     return (
@@ -107,15 +147,15 @@ export default function SettingsPage() {
                 General
               </button>
               <button
-                onClick={() => setActiveTab('account')}
+                onClick={() => setActiveTab('profile')}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'account'
+                  activeTab === 'profile'
                     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
               >
                 <User className="w-5 h-5" />
-                Account
+                Profile
               </button>
             </nav>
           </div>
@@ -160,14 +200,163 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {activeTab === 'account' && (
+              {activeTab === 'profile' && (
                 <div className="space-y-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Account Information
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Account settings coming soon...
-                  </p>
+                  <div>
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Profile Information
+                      </h3>
+                      {!isEditingProfile && (
+                        <button
+                          onClick={() => setIsEditingProfile(true)}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                        >
+                          <Edit2 size={16} />
+                          Edit Profile
+                        </button>
+                      )}
+                    </div>
+
+                    {savedMessage && (
+                      <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-lg">
+                        ✓ {savedMessage}
+                      </div>
+                    )}
+
+                    {isEditingProfile ? (
+                      <div className="space-y-4">
+                        {/* Full Name */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Full Name
+                          </label>
+                          <input
+                            type="text"
+                            value={profileData.full_name}
+                            onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter your full name"
+                          />
+                        </div>
+
+                        {/* Email */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Email Address
+                          </label>
+                          <input
+                            type="email"
+                            value={profileData.email}
+                            onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter your email address"
+                          />
+                        </div>
+
+                        {/* Username (Read-only) */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Username
+                          </label>
+                          <input
+                            type="text"
+                            value={user?.username || ''}
+                            disabled
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white cursor-not-allowed"
+                          />
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Username cannot be changed</p>
+                        </div>
+
+                        {/* Role (Read-only) */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Role
+                          </label>
+                          <input
+                            type="text"
+                            value={user?.role?.replace('_', ' ').toUpperCase() || ''}
+                            disabled
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white cursor-not-allowed"
+                          />
+                        </div>
+
+                        {/* Organization (Read-only) */}
+                        {user?.organization && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Organization
+                            </label>
+                            <input
+                              type="text"
+                              value={user.organization.name || ''}
+                              disabled
+                              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white cursor-not-allowed"
+                            />
+                          </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                          <button
+                            onClick={handleProfileUpdate}
+                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                          >
+                            <Save size={16} />
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={handleCancel}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg transition-colors"
+                          >
+                            <X size={16} />
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Display Profile Info */}
+                        <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                              {user?.full_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || 'U'}
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                                {user?.full_name || 'User Profile'}
+                              </h4>
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300">
+                                  <Mail size={18} className="text-gray-500" />
+                                  <div>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+                                    <p className="font-medium">{user?.email || 'Not provided'}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300">
+                                  <Briefcase size={18} className="text-gray-500" />
+                                  <div>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Role</p>
+                                    <p className="font-medium">{user?.role?.replace('_', ' ').toUpperCase()}</p>
+                                  </div>
+                                </div>
+                                {user?.organization && (
+                                  <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300">
+                                    <MapPin size={18} className="text-gray-500" />
+                                    <div>
+                                      <p className="text-sm text-gray-600 dark:text-gray-400">Organization</p>
+                                      <p className="font-medium">{user.organization.name}</p>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
