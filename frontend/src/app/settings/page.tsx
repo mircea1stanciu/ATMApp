@@ -25,6 +25,7 @@ export default function SettingsPage() {
   const [profileData, setProfileData] = useState({
     full_name: '',
     email: '',
+    username: '',
   });
   const [savedMessage, setSavedMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -51,6 +52,7 @@ export default function SettingsPage() {
         setProfileData({
           full_name: userData.full_name || '',
           email: userData.email || '',
+          username: userData.username || '',
         });
         
         // Set default tab based on user role
@@ -73,18 +75,44 @@ export default function SettingsPage() {
     setLoading(false);
   }, [router]);
 
-  const handleProfileUpdate = () => {
+  const handleProfileUpdate = async () => {
     if (user) {
-      const updatedUser = {
-        ...user,
-        full_name: profileData.full_name,
-        email: profileData.email,
-      };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      setIsEditingProfile(false);
-      setSavedMessage('Profile updated successfully!');
-      setTimeout(() => setSavedMessage(''), 3000);
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:8002/api/auth/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            username: profileData.username,
+            full_name: profileData.full_name,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          setErrorMessage(error.detail || 'Failed to update profile');
+          return;
+        }
+
+        const data = await response.json();
+        
+        const updatedUser = {
+          ...user,
+          full_name: data.user.full_name,
+          username: data.user.username,
+        };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        setIsEditingProfile(false);
+        setSavedMessage('Profile updated successfully!');
+        setErrorMessage('');
+        setTimeout(() => setSavedMessage(''), 3000);
+      } catch (error) {
+        setErrorMessage('Failed to update profile');
+      }
     }
   };
 
@@ -93,6 +121,7 @@ export default function SettingsPage() {
       setProfileData({
         full_name: user.full_name || '',
         email: user.email || '',
+        username: user.username || '',
       });
     }
     setIsEditingProfile(false);
@@ -306,6 +335,13 @@ export default function SettingsPage() {
                       </div>
                     )}
 
+                    {errorMessage && (
+                      <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg flex items-center gap-2">
+                        <AlertCircle size={18} />
+                        {errorMessage}
+                      </div>
+                    )}
+
                     {isEditingProfile ? (
                       <div className="space-y-4">
                         {/* Full Name */}
@@ -330,24 +366,24 @@ export default function SettingsPage() {
                           <input
                             type="email"
                             value={profileData.email}
-                            onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Enter your email address"
+                            disabled
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white cursor-not-allowed"
                           />
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Email address cannot be changed</p>
                         </div>
 
-                        {/* Username (Read-only) */}
+                        {/* Username */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Username
                           </label>
                           <input
                             type="text"
-                            value={user?.username || ''}
-                            disabled
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white cursor-not-allowed"
+                            value={profileData.username}
+                            onChange={(e) => setProfileData({ ...profileData, username: e.target.value })}
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter your username"
                           />
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Username cannot be changed</p>
                         </div>
 
                         {/* Role (Read-only) */}

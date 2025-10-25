@@ -174,6 +174,10 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
+class ProfileUpdateRequest(BaseModel):
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
@@ -285,20 +289,56 @@ async def change_password(
         raise HTTPException(status_code=400, detail="Current password and new password are required")
     
     # Verify current password
-    if not pwd_context.verify(current_password, current_user.password_hash):
+    if not pwd_context.verify(current_password, current_user.hashed_password):
         raise HTTPException(status_code=401, detail="Current password is incorrect")
     
     # Hash new password
     new_password_hash = pwd_context.hash(new_password)
     
     # Update password in database
-    current_user.password_hash = new_password_hash
+    current_user.hashed_password = new_password_hash
     db.add(current_user)
     db.commit()
     
     return {
         "message": "Password changed successfully",
         "status": "success"
+    }
+
+@app.put("/api/auth/profile", tags=["Authentication"])
+async def update_profile(
+    profile_update: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update user profile (username and full name)"""
+    
+    # Check if new username is provided and already taken
+    if profile_update.username and profile_update.username != current_user.username:
+        existing_user = db.query(User).filter(User.username == profile_update.username).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already taken")
+        current_user.username = profile_update.username
+    
+    # Update full name if provided
+    if profile_update.full_name is not None:
+        current_user.full_name = profile_update.full_name
+    
+    # Save changes
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    
+    return {
+        "message": "Profile updated successfully",
+        "status": "success",
+        "user": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "full_name": current_user.full_name,
+            "email": current_user.email,
+            "role": current_user.role.value
+        }
     }
 
 @app.post("/api/auth/register", response_model=TokenResponse, tags=["Authentication"])
