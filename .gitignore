@@ -53,3 +53,5 @@ frontend/build/
 # Backup files
 *.backup
 *_old.*
+# Database backups
+backend/backups/*.db

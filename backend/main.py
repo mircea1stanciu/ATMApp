@@ -485,9 +485,12 @@ async def setup_2fa(
     img_byte_arr.seek(0)
     qr_code_base64 = base64.b64encode(img_byte_arr.getvalue()).decode()
     
-    # Store secret temporarily on the user object (will be saved when verified)
-    # In production, use Redis or session storage
-    current_user._temp_2fa_secret = secret
+    # Store secret in database (unverified - two_fa_enabled is still False)
+    # The secret will only be "activated" when the user verifies the code
+    current_user.two_fa_secret = secret
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
     
     return {
         "qr_code": qr_code_base64,
@@ -509,25 +512,20 @@ async def enable_2fa(
     if current_user.two_fa_enabled:
         raise HTTPException(status_code=400, detail="2FA is already enabled")
     
-    # Check if user has a current secret (from setup endpoint)
-    if not hasattr(current_user, '_temp_2fa_secret') or not current_user._temp_2fa_secret:
-        raise HTTPException(status_code=400, detail="Please setup 2FA first")
+    # Check if user has a pending secret (from setup endpoint)
+    if not current_user.two_fa_secret:
+        raise HTTPException(status_code=400, detail="Please setup 2FA first using /api/auth/2fa/setup")
     
-    # Verify the code
-    totp = pyotp.TOTP(current_user._temp_2fa_secret)
+    # Verify the code against the stored secret
+    totp = pyotp.TOTP(current_user.two_fa_secret)
     if not totp.verify(enable_request.verify_code, valid_window=1):
         raise HTTPException(status_code=400, detail="Invalid verification code")
     
-    # Enable 2FA on the user
+    # Enable 2FA on the user (secret is already stored)
     current_user.two_fa_enabled = True
-    current_user.two_fa_secret = current_user._temp_2fa_secret
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
-    
-    # Clear temporary secret
-    if hasattr(current_user, '_temp_2fa_secret'):
-        delattr(current_user, '_temp_2fa_secret')
     
     return {
         "message": "2FA enabled successfully",
