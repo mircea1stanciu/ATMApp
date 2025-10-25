@@ -429,7 +429,7 @@ async def register_org_admin(register_data: dict, db: Session = Depends(get_db))
     )
 
 
-@app.post("/api/auth/register-user", response_model=TokenResponse, tags=["Authentication"])
+@app.post("/api/auth/register-user", tags=["Authentication"])
 async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
     """Register as regular user within an organization"""
     
