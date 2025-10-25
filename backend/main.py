@@ -285,6 +285,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role.value,
+            "two_fa_enabled": user.two_fa_enabled,
             "assigned_communities": json.loads(user.assigned_communities) if user.assigned_communities else [],
             "organization": org_info
         }
@@ -357,6 +358,7 @@ async def login_verify_2fa(login_data: Login2FARequest, db: Session = Depends(ge
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role.value,
+            "two_fa_enabled": user.two_fa_enabled,
             "assigned_communities": json.loads(user.assigned_communities) if user.assigned_communities else [],
             "organization": org_info
         }
@@ -383,6 +385,7 @@ async def get_current_user_info(current_user: User = Depends(get_current_user), 
         "email": current_user.email,
         "full_name": current_user.full_name,
         "role": current_user.role.value,
+        "two_fa_enabled": current_user.two_fa_enabled,
         "assigned_communities": json.loads(current_user.assigned_communities) if current_user.assigned_communities else [],
         "organization": org_info
     }
