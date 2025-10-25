@@ -203,8 +203,8 @@ export default function Header({ currentCommunity, onClear, onShowExamples, onLo
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
-            {/* Settings Link - AI Model Selection */}
-            {isAuthenticated && (
+            {/* Settings Link - AI Model Selection - Only for super_admin, org_admin, community_lead */}
+            {isAuthenticated && ['super_admin', 'org_admin', 'community_lead'].includes(userRole) && (
               <Link
                 href="/settings"
                 className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200 relative"

@@ -1,13 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Settings, User, Moon, Sun, Sparkles, ArrowLeft } from 'lucide-react';
 import ModelSelector from '@/components/ModelSelector';
 
+interface UserData {
+  id: number;
+  role: string;
+  username: string;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'general' | 'ai-models' | 'account'>('ai-models');
+  const [user, setUser] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const userData = JSON.parse(userStr);
+        setUser(userData);
+        
+        // Check if user has access to AI Model Selection
+        const allowedRoles = ['super_admin', 'org_admin', 'community_lead'];
+        if (!allowedRoles.includes(userData.role)) {
+          // Redirect users without permission
+          router.push('/dashboard');
+          return;
+        }
+      } catch (e) {
+        router.push('/login');
+        return;
+      }
+    } else {
+      router.push('/login');
+      return;
+    }
+    setLoading(false);
+  }, [router]);
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
