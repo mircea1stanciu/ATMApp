@@ -523,10 +523,10 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
     assigned_communities_response = json.loads(new_user.assigned_communities) if new_user.assigned_communities else []
     print(f"[REGISTER-USER DEBUG] Response assigned_communities: {assigned_communities_response}")
     
-    return TokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-        user={
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
             "id": new_user.id,
             "username": new_user.username,
             "email": new_user.email,
@@ -540,7 +540,7 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
                 "subscription_plan": org.subscription_plan.value
             }
         }
-    )
+    }
 
 # Community-specific chat endpoints
 @app.post("/api/communities/{community_id}/chat", response_model=ChatResponse, tags=["Communities"])
