@@ -408,7 +408,7 @@ export default function SettingsPage() {
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                         Profile Information
                       </h3>
-                      {!isEditingProfile && (
+                      {!isEditingProfile && twoFAEnabled && (
                         <button
                           onClick={() => setIsEditingProfile(true)}
                           className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -417,11 +417,31 @@ export default function SettingsPage() {
                           Edit Profile
                         </button>
                       )}
+                      {!isEditingProfile && !twoFAEnabled && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed" title="Enable 2FA to edit profile">
+                          <Edit2 size={16} />
+                          Edit Profile
+                        </div>
+                      )}
                     </div>
 
                     {savedMessage && (
                       <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-lg">
                         ✓ {savedMessage}
+                      </div>
+                    )}
+
+                    {!twoFAEnabled && !isEditingProfile && (
+                      <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg flex items-start gap-3">
+                        <AlertCircle size={20} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-amber-900 dark:text-amber-200">
+                            Two-Factor Authentication Required
+                          </p>
+                          <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">
+                            You need to enable 2FA to edit your profile information.
+                          </p>
+                        </div>
                       </div>
                     )}
 
@@ -575,7 +595,7 @@ export default function SettingsPage() {
                           Change Password
                         </h3>
                       </div>
-                      {!isChangingPassword && (
+                      {!isChangingPassword && twoFAEnabled && (
                         <button
                           onClick={() => setIsChangingPassword(true)}
                           className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -584,7 +604,27 @@ export default function SettingsPage() {
                           Change Password
                         </button>
                       )}
+                      {!isChangingPassword && !twoFAEnabled && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed" title="Enable 2FA to change password">
+                          <Edit2 size={16} />
+                          Change Password
+                        </div>
+                      )}
                     </div>
+
+                    {!twoFAEnabled && !isChangingPassword && (
+                      <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg flex items-start gap-3">
+                        <AlertCircle size={20} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-amber-900 dark:text-amber-200">
+                            Two-Factor Authentication Required
+                          </p>
+                          <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">
+                            You need to enable 2FA before you can change your password.
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     {errorMessage && (
                       <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg flex items-start gap-2">
