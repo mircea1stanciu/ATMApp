@@ -195,10 +195,17 @@ class Enable2FAResponse(BaseModel):
 class Verify2FARequest(BaseModel):
     code: str  # 6-digit TOTP code
 
+class Login2FARequest(BaseModel):
+    username: str
+    password: str
+    totp_code: str  # 6-digit TOTP code for 2FA
+    organization_slug: Optional[str] = None
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
     user: dict
+    requires_2fa: Optional[bool] = False  # Indicates if 2FA is required
 
 class ChatMessage(BaseModel):
     message: str
@@ -232,6 +239,21 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                 detail="Your organization has been blocked. Please contact support."
             )
     
+    # Check if user has 2FA enabled
+    if user.two_fa_enabled:
+        # Return response indicating 2FA is required (no token yet)
+        return TokenResponse(
+            access_token="",  # Empty token
+            token_type="bearer",
+            requires_2fa=True,
+            user={
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+            }
+        )
+    
+    # No 2FA required, proceed with normal login
     user.last_login = datetime.utcnow()
     db.commit()
     
@@ -256,6 +278,79 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
+        requires_2fa=False,
+        user={
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role.value,
+            "assigned_communities": json.loads(user.assigned_communities) if user.assigned_communities else [],
+            "organization": org_info
+        }
+    )
+
+@app.post("/api/auth/login/verify-2fa", response_model=TokenResponse, tags=["Authentication"])
+async def login_verify_2fa(login_data: Login2FARequest, db: Session = Depends(get_db)):
+    """Verify 2FA code and complete login"""
+    # Authenticate user with username and password
+    user = authenticate_user(
+        db, 
+        login_data.username, 
+        login_data.password,
+        login_data.organization_slug
+    )
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Check if user has 2FA enabled
+    if not user.two_fa_enabled:
+        raise HTTPException(status_code=400, detail="2FA is not enabled for this user")
+    
+    # Verify the TOTP code
+    if not user.two_fa_secret:
+        raise HTTPException(status_code=500, detail="2FA secret not found")
+    
+    totp = pyotp.TOTP(user.two_fa_secret)
+    if not totp.verify(login_data.totp_code, valid_window=1):
+        raise HTTPException(status_code=401, detail="Invalid 2FA code")
+    
+    # Check if organization is blocked
+    if user.organization_id:
+        org = db.query(Organization).filter(Organization.id == user.organization_id).first()
+        if org and not org.is_active:
+            raise HTTPException(
+                status_code=403, 
+                detail="Your organization has been blocked. Please contact support."
+            )
+    
+    # 2FA verified successfully, issue token
+    user.last_login = datetime.utcnow()
+    db.commit()
+    
+    access_token = create_access_token(
+        data={
+            "user_id": user.id,
+            "username": user.username,
+            "role": user.role.value,
+            "organization_id": user.organization_id
+        }
+    )
+    
+    org_info = None
+    if user.organization:
+        org_info = {
+            "id": user.organization.id,
+            "name": user.organization.name,
+            "slug": user.organization.slug,
+            "subscription_plan": user.organization.subscription_plan.value
+        }
+    
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        requires_2fa=False,
         user={
             "id": user.id,
             "username": user.username,
