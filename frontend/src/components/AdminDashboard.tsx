@@ -925,6 +925,7 @@ export default function AdminDashboard() {
                         <thead>
                           <tr className="border-b border-gray-200 dark:border-gray-700">
                             <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Organization</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Slug</th>
                             <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Plan</th>
                             <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Users</th>
                             <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Status</th>
@@ -936,10 +937,12 @@ export default function AdminDashboard() {
                           {organizations.map((org) => (
                             <tr key={org.id} className="border-b border-gray-100 dark:border-gray-700">
                               <td className="py-3">
-                                <div>
-                                  <div className="font-medium text-gray-900 dark:text-white">{org.name}</div>
-                                  <div className="text-sm text-gray-500 dark:text-gray-400">{org.slug}</div>
-                                </div>
+                                <div className="font-medium text-gray-900 dark:text-white">{org.name}</div>
+                              </td>
+                              <td className="py-3">
+                                <code className="text-xs sm:text-sm font-mono text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
+                                  {org.slug}
+                                </code>
                               </td>
                               <td className="py-3">
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
