@@ -483,12 +483,19 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
         if role_value in ["USER", "COMMUNITY_LEAD"]:
             user_role = UserRole[role_value]
     
+    print(f"[REGISTER-USER DEBUG] After role check - user_role: {user_role}, has assigned_communities in payload: {register_data.get('assigned_communities')}")
+    print(f"[REGISTER-USER DEBUG] Condition check: role is COMMUNITY_LEAD or USER: {user_role == UserRole.COMMUNITY_LEAD or user_role == UserRole.USER}")
+    print(f"[REGISTER-USER DEBUG] Condition check: assigned_communities is not empty: {bool(register_data.get('assigned_communities'))}")
+    
     # Handle community assignments for community leads and regular users
     if (user_role == UserRole.COMMUNITY_LEAD or user_role == UserRole.USER) and register_data.get("assigned_communities"):
         import json
         assigned_communities = json.dumps(register_data["assigned_communities"])
+        print(f"[REGISTER-USER DEBUG] ✅ Entering community assignment block")
         print(f"[REGISTER-USER DEBUG] Communities before JSON dump: {register_data.get('assigned_communities')}")
         print(f"[REGISTER-USER DEBUG] Communities after JSON dump: {assigned_communities}")
+    else:
+        print(f"[REGISTER-USER DEBUG] ❌ NOT entering community assignment block - assigned_communities will be None")
     
     # Create regular user
     new_user = User(
