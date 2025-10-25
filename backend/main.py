@@ -219,10 +219,12 @@ class RegisterRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
+    two_fa_code: Optional[str] = None
 
 class ProfileUpdateRequest(BaseModel):
     username: Optional[str] = None
     full_name: Optional[str] = None
+    two_fa_code: Optional[str] = None
 
 class Enable2FARequest(BaseModel):
     verify_code: Optional[str] = None  # Optional for step 1, required for step 2
@@ -487,6 +489,7 @@ async def change_password(
     """Change user password"""
     current_password = change_pwd_request.current_password
     new_password = change_pwd_request.new_password
+    two_fa_code = change_pwd_request.two_fa_code
     
     if not current_password or not new_password:
         raise HTTPException(status_code=400, detail="Current password and new password are required")
@@ -494,6 +497,16 @@ async def change_password(
     # Verify current password
     if not pwd_context.verify(current_password, current_user.hashed_password):
         raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    # Check 2FA requirement
+    if current_user.two_fa_enabled:
+        if not two_fa_code:
+            raise HTTPException(status_code=403, detail="2FA code is required for sensitive operations")
+        
+        # Verify the TOTP code
+        totp = pyotp.TOTP(current_user.two_fa_secret)
+        if not totp.verify(two_fa_code, valid_window=1):
+            raise HTTPException(status_code=401, detail="Invalid 2FA code")
     
     # Hash new password
     new_password_hash = pwd_context.hash(new_password)
@@ -515,6 +528,16 @@ async def update_profile(
     db: Session = Depends(get_db)
 ):
     """Update user profile (username and full name)"""
+    
+    # Check 2FA requirement
+    if current_user.two_fa_enabled:
+        if not profile_update.two_fa_code:
+            raise HTTPException(status_code=403, detail="2FA code is required for sensitive operations")
+        
+        # Verify the TOTP code
+        totp = pyotp.TOTP(current_user.two_fa_secret)
+        if not totp.verify(profile_update.two_fa_code, valid_window=1):
+            raise HTTPException(status_code=401, detail="Invalid 2FA code")
     
     # Check if new username is provided and already taken
     if profile_update.username and profile_update.username != current_user.username:

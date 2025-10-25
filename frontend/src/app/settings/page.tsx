@@ -50,6 +50,11 @@ export default function SettingsPage() {
   const [twoFASecret, setTwoFASecret] = useState<string>('');
   const [twoFAVerifyCode, setTwoFAVerifyCode] = useState('');
   const [twoFALoading, setTwoFALoading] = useState(false);
+  
+  // 2FA verification for profile/password changes
+  const [showTwoFAVerification, setShowTwoFAVerification] = useState(false);
+  const [twoFAVerificationCode, setTwoFAVerificationCode] = useState('');
+  const [pendingAction, setPendingAction] = useState<'profile' | 'password' | null>(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -85,8 +90,22 @@ export default function SettingsPage() {
   }, [router]);
 
   const handleProfileUpdate = async () => {
+    // Show 2FA verification dialog instead of directly updating
+    setPendingAction('profile');
+    setShowTwoFAVerification(true);
+    setTwoFAVerificationCode('');
+    setErrorMessage('');
+  };
+
+  const handleConfirmProfileUpdate = async () => {
+    if (!twoFAVerificationCode || twoFAVerificationCode.length !== 6) {
+      setErrorMessage('Please enter a valid 6-digit 2FA code');
+      return;
+    }
+
     if (user) {
       try {
+        setIsLoading(true);
         const token = localStorage.getItem('token');
         const response = await fetch('http://localhost:8002/api/auth/profile', {
           method: 'PUT',
@@ -97,12 +116,14 @@ export default function SettingsPage() {
           body: JSON.stringify({
             username: profileData.username,
             full_name: profileData.full_name,
+            two_fa_code: twoFAVerificationCode,
           }),
         });
 
         if (!response.ok) {
           const error = await response.json();
           setErrorMessage(error.detail || 'Failed to update profile');
+          setIsLoading(false);
           return;
         }
 
@@ -118,12 +139,19 @@ export default function SettingsPage() {
         setIsEditingProfile(false);
         setSavedMessage('Profile updated successfully!');
         setErrorMessage('');
+        setShowTwoFAVerification(false);
+        setPendingAction(null);
+        setTwoFAVerificationCode('');
         setTimeout(() => setSavedMessage(''), 3000);
+        setIsLoading(false);
       } catch (error) {
         setErrorMessage('Failed to update profile');
+        setIsLoading(false);
       }
     }
   };
+
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleCancel = () => {
     if (user) {
@@ -134,34 +162,35 @@ export default function SettingsPage() {
       });
     }
     setIsEditingProfile(false);
+    setShowTwoFAVerification(false);
+    setPendingAction(null);
+    setTwoFAVerificationCode('');
   };
 
   const handlePasswordChange = async () => {
+    // Show 2FA verification dialog instead of directly changing password
+    setPendingAction('password');
+    setShowTwoFAVerification(true);
+    setTwoFAVerificationCode('');
+    setErrorMessage('');
+    setIsChangingPassword(false);
+  };
+
+  const handleConfirmPasswordChange = async () => {
     setErrorMessage('');
     
-    // Validation
-    if (!passwordData.currentPassword) {
-      setErrorMessage('Current password is required');
+    // Validate 2FA code
+    if (!twoFAVerificationCode) {
+      setErrorMessage('2FA code is required');
       return;
     }
-    if (!passwordData.newPassword) {
-      setErrorMessage('New password is required');
-      return;
-    }
-    if (passwordData.newPassword.length < 6) {
-      setErrorMessage('New password must be at least 6 characters');
-      return;
-    }
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setErrorMessage('New passwords do not match');
-      return;
-    }
-    if (passwordData.currentPassword === passwordData.newPassword) {
-      setErrorMessage('New password must be different from current password');
+    if (twoFAVerificationCode.length !== 6 || !/^\d+$/.test(twoFAVerificationCode)) {
+      setErrorMessage('2FA code must be 6 digits');
       return;
     }
 
     try {
+      setIsLoading(true);
       const token = localStorage.getItem('token');
       const response = await fetch('http://localhost:8002/api/auth/change-password', {
         method: 'POST',
@@ -172,6 +201,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           current_password: passwordData.currentPassword,
           new_password: passwordData.newPassword,
+          two_fa_code: twoFAVerificationCode,
         }),
       });
 
@@ -182,6 +212,8 @@ export default function SettingsPage() {
           newPassword: '',
           confirmPassword: '',
         });
+        setShowTwoFAVerification(false);
+        setTwoFAVerificationCode('');
         setIsChangingPassword(false);
         setTimeout(() => setSavedMessage(''), 3000);
       } else {
@@ -191,6 +223,8 @@ export default function SettingsPage() {
     } catch (error) {
       setErrorMessage('Error changing password. Please try again.');
       console.error('Password change error:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -736,6 +770,90 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* 2FA Verification Modal */}
+                  {showTwoFAVerification && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                          <Shield size={24} className="text-purple-600 dark:text-purple-400" />
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            Verify Your Identity
+                          </h3>
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-400 mb-4">
+                          {pendingAction === 'profile'
+                            ? 'Enter your 2FA code to save profile changes:'
+                            : 'Enter your 2FA code to change your password:'}
+                        </p>
+
+                        {/* 2FA Code Input */}
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            6-Digit Authentication Code
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={twoFAVerificationCode}
+                            onChange={(e) => setTwoFAVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            placeholder="000000"
+                            className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          />
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Enter the code from your authenticator app
+                          </p>
+                        </div>
+
+                        {/* Error Message */}
+                        {errorMessage && (
+                          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg">
+                            <p className="text-red-700 dark:text-red-300 text-sm">{errorMessage}</p>
+                          </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => {
+                              if (pendingAction === 'profile') {
+                                handleConfirmProfileUpdate();
+                              } else {
+                                handleConfirmPasswordChange();
+                              }
+                            }}
+                            disabled={isLoading || twoFAVerificationCode.length !== 6}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                          >
+                            {isLoading ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                Verifying...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle size={16} />
+                                Verify & Continue
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowTwoFAVerification(false);
+                              setTwoFAVerificationCode('');
+                              setErrorMessage('');
+                              setPendingAction(null);
+                            }}
+                            disabled={isLoading}
+                            className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-300 disabled:cursor-not-allowed text-gray-900 rounded-lg transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Two-Factor Authentication Section */}
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
