@@ -269,10 +269,14 @@ export default function AdminDashboard() {
         if (currentUser.organization?.id) {
           console.log(`📋 Loading users for organization ID: ${currentUser.organization.id}`);
           const orgUsers = await apiCall(`/api/organizations/${currentUser.organization.id}/users`);
-          const usersWithOrg = orgUsers.map((user: User) => ({
-            ...user,
-            organization: { id: currentUser.organization?.id, name: currentUser.organization?.name || '' }
-          }));
+          console.log(`📋 Org Users received:`, orgUsers);
+          const usersWithOrg = orgUsers.map((user: User) => {
+            console.log(`  User: ${user.username}, assigned_communities type: ${typeof user.assigned_communities}, value:`, user.assigned_communities);
+            return {
+              ...user,
+              organization: { id: currentUser.organization?.id, name: currentUser.organization?.name || '' }
+            };
+          });
           setUsers(usersWithOrg);
         } else {
           console.error('❌ Org Admin has no organization ID');
@@ -291,10 +295,13 @@ export default function AdminDashboard() {
             const orgUsers = await apiCall(`/api/organizations/${org.id}/users`);
             console.log(`    ✅ Loaded ${orgUsers.length} users`);
             // Add organization info to each user
-            const usersWithOrg = orgUsers.map((user: User) => ({
-              ...user,
-              organization: { id: org.id, name: org.name }
-            }));
+            const usersWithOrg = orgUsers.map((user: User) => {
+              console.log(`    User: ${user.username}, assigned_communities type: ${typeof user.assigned_communities}, value:`, user.assigned_communities);
+              return {
+                ...user,
+                organization: { id: org.id, name: org.name }
+              };
+            });
             allUsers = [...allUsers, ...usersWithOrg];
           } catch (err) {
             console.error(`    ❌ Failed to load users for ${org.name} (ID: ${org.id}):`, err);
@@ -1188,17 +1195,23 @@ export default function AdminDashboard() {
                                 </span>
                               </td>
                               <td className="py-3">
-                                {((user.role === 'community_lead' || user.role === 'user') && user.assigned_communities && Array.isArray(user.assigned_communities) && user.assigned_communities.length > 0) ? (
-                                  <div className="flex gap-1 flex-wrap max-w-[200px]">
-                                    {user.assigned_communities.map((comm: string) => (
-                                      <span key={comm} className="px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                        {comm}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-xs sm:text-sm text-gray-400">-</span>
-                                )}
+                                {
+                                  (() => {
+                                    console.log(`🔍 Rendering communities for user ${user.username}: role=${user.role}, communities=${user.assigned_communities}, isArray=${Array.isArray(user.assigned_communities)}, length=${user.assigned_communities?.length || 0}`);
+                                    if ((user.role === 'community_lead' || user.role === 'user') && user.assigned_communities && Array.isArray(user.assigned_communities) && user.assigned_communities.length > 0) {
+                                      return (
+                                        <div className="flex gap-1 flex-wrap max-w-[200px]">
+                                          {user.assigned_communities.map((comm: string) => (
+                                            <span key={comm} className="px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                              {comm}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      );
+                                    }
+                                    return <span className="text-xs sm:text-sm text-gray-400">-</span>;
+                                  })()
+                                }
                               </td>
                               <td className="py-3">
                                 <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium ${
