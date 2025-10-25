@@ -18,7 +18,7 @@ interface UserData {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'general' | 'ai-models' | 'profile'>('general');
+  const [activeTab, setActiveTab] = useState<'ai-models' | 'profile'>('profile');
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -66,8 +66,8 @@ export default function SettingsPage() {
         // Set default tab based on user role
         const allowedRoles = ['super_admin', 'org_admin', 'community_lead'];
         if (!allowedRoles.includes(userData.role)) {
-          // Regular users default to 'general' tab
-          setActiveTab('general');
+          // Regular users default to 'profile' tab
+          setActiveTab('profile');
         } else {
           // Admins and community leads default to 'ai-models' tab
           setActiveTab('ai-models');
@@ -379,17 +379,6 @@ export default function SettingsPage() {
                 </button>
               )}
               <button
-                onClick={() => setActiveTab('general')}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'general'
-                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                <Settings className="w-5 h-5" />
-                General
-              </button>
-              <button
                 onClick={() => setActiveTab('profile')}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
                   activeTab === 'profile'
@@ -409,37 +398,6 @@ export default function SettingsPage() {
               {activeTab === 'ai-models' && (
                 <div>
                   <ModelSelector />
-                </div>
-              )}
-
-              {activeTab === 'general' && (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                      General Settings
-                    </h3>
-                    
-                    {/* Theme Selector */}
-                    <div className="space-y-3">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Theme
-                      </label>
-                      <div className="grid grid-cols-3 gap-3">
-                        <button className="flex flex-col items-center gap-2 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 transition-colors">
-                          <Sun className="w-6 h-6" />
-                          <span className="text-sm">Light</span>
-                        </button>
-                        <button className="flex flex-col items-center gap-2 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 transition-colors">
-                          <Moon className="w-6 h-6" />
-                          <span className="text-sm">Dark</span>
-                        </button>
-                        <button className="flex flex-col items-center gap-2 p-4 border-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                          <Settings className="w-6 h-6 text-blue-600" />
-                          <span className="text-sm text-blue-600">System</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
 

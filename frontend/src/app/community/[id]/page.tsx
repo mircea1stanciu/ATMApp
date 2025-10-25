@@ -365,39 +365,87 @@ export default function CommunityPage() {
       return;
     }
 
-    try {
-      const userData = JSON.parse(userStr);
-      setUser(userData);
-      
-      // Check if user has 2FA enabled - if not, deny access
-      const twoFAEnabled = userData.two_fa_enabled || false;
-      setHas2FA(twoFAEnabled);
-      
-      if (!twoFAEnabled) {
-        setHasAccess(false);
-        return;
+    const checkAccess = async () => {
+      try {
+        const cachedUserData = JSON.parse(userStr);
+        setUser(cachedUserData);
+        
+        // Fetch the latest user data from the backend to get current 2FA status
+        const token = localStorage.getItem('token');
+        if (token) {
+          try {
+            const response = await fetch('http://localhost:8002/api/auth/me', {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            if (response.ok) {
+              const latestUserData = await response.json();
+              setUser(latestUserData);
+              
+              // Check if user has 2FA enabled - if not, deny access
+              const twoFAEnabled = latestUserData.two_fa_enabled || false;
+              setHas2FA(twoFAEnabled);
+              
+              if (!twoFAEnabled) {
+                setHasAccess(false);
+                return;
+              }
+              
+              // Super admins and org admins have access to all communities
+              if (latestUserData.role === 'super_admin' || latestUserData.role === 'org_admin') {
+                setHasAccess(true);
+                return;
+              }
+              
+              // Community leads have access to all communities
+              if (latestUserData.role === 'community_lead') {
+                setHasAccess(true);
+                return;
+              }
+              
+              // Regular users need to have the community assigned
+              const assignedCommunities = latestUserData.assigned_communities || [];
+              const hasAccessToCommunity = assignedCommunities.includes(communityId);
+              setHasAccess(hasAccessToCommunity);
+              return;
+            }
+          } catch (error) {
+            // If fetch fails, fall back to cached data
+            console.warn('Failed to fetch latest user data, using cached:', error);
+          }
+        }
+        
+        // Fallback to cached data if API call fails
+        const twoFAEnabled = cachedUserData.two_fa_enabled || false;
+        setHas2FA(twoFAEnabled);
+        
+        if (!twoFAEnabled) {
+          setHasAccess(false);
+          return;
+        }
+        
+        if (cachedUserData.role === 'super_admin' || cachedUserData.role === 'org_admin') {
+          setHasAccess(true);
+          return;
+        }
+        
+        if (cachedUserData.role === 'community_lead') {
+          setHasAccess(true);
+          return;
+        }
+        
+        const assignedCommunities = cachedUserData.assigned_communities || [];
+        const hasAccessToCommunity = assignedCommunities.includes(communityId);
+        setHasAccess(hasAccessToCommunity);
+        
+      } catch (e) {
+        router.push('/login');
       }
-      
-      // Super admins and org admins have access to all communities
-      if (userData.role === 'super_admin' || userData.role === 'org_admin') {
-        setHasAccess(true);
-        return;
-      }
-      
-      // Community leads have access to all communities (elevated user role for future features)
-      if (userData.role === 'community_lead') {
-        setHasAccess(true);
-        return;
-      }
-      
-      // Regular users need to have the community assigned
-      const assignedCommunities = userData.assigned_communities || [];
-      const hasAccessToCommunity = assignedCommunities.includes(communityId);
-      setHasAccess(hasAccessToCommunity);
-      
-    } catch (e) {
-      router.push('/login');
-    }
+    };
+
+    checkAccess();
   }, [communityId, router]);
 
   // Listen for request to open chat

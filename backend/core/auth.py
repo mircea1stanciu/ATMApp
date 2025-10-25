@@ -5,7 +5,7 @@ JWT token management and user authentication
 import os
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -81,10 +81,11 @@ def get_organization_from_subdomain(slug: str, db: Session):
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ):
-    """Get current authenticated user from JWT token"""
+    """Get current authenticated user from JWT token (cookie or header)"""
     from .database import User
     
     credentials_exception = HTTPException(
@@ -93,8 +94,16 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
+    # Try to get token from cookie first, then fall back to Authorization header
+    token = request.cookies.get("access_token")
+    if not token and credentials:
+        token = credentials.credentials
+    
+    if not token:
+        raise credentials_exception
+    
     try:
-        payload = verify_token(credentials.credentials)
+        payload = verify_token(token)
         if payload is None:
             raise credentials_exception
             

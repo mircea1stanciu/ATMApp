@@ -1,7 +1,7 @@
 # UnifiedWork Backend - AI-Powered Unified Workspace
 # Comprehensive multi-tenant SaaS platform for tech teams
 
-from fastapi import FastAPI, HTTPException, Depends, Request, Body
+from fastapi import FastAPI, HTTPException, Depends, Request, Body, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -14,7 +14,22 @@ import os
 import json
 import io
 import base64
+import logging
 from dotenv import load_dotenv
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('auth_audit.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Import for 2FA
 import pyotp
@@ -64,6 +79,9 @@ def check_community_access(user: User, community_id: str):
     
     return True
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 # Initialize FastAPI app
 app = FastAPI(
     title="UnifiedWork API",
@@ -110,6 +128,10 @@ Authorization: Bearer <your_jwt_token>
     ]
 )
 
+# Add rate limiter state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -118,6 +140,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Prevent clickjacking attacks
+    response.headers["X-Frame-Options"] = "DENY"
+    # Prevent MIME type sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # Enable XSS protection
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    # Content Security Policy - adjust as needed
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+    # Referrer policy
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Permissions policy
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
 
 # Include routers
 app.include_router(project_routes.router)
@@ -218,8 +258,14 @@ class ChatResponse(BaseModel):
 
 # Authentication endpoints
 @app.post("/api/auth/login", response_model=TokenResponse, tags=["Authentication"])
-async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")  # Max 5 login attempts per minute per IP
+async def login(request: Request, login_data: LoginRequest, response: Response, db: Session = Depends(get_db)):
     """Login with multi-tenant support"""
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Log login attempt
+    logger.info(f"Login attempt - Username: {login_data.username}, IP: {client_ip}, Org: {login_data.organization_slug or 'None'}")
+    
     user = authenticate_user(
         db, 
         login_data.username, 
@@ -228,6 +274,8 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     )
     
     if not user:
+        # Log failed login
+        logger.warning(f"Failed login - Username: {login_data.username}, IP: {client_ip}, Reason: Invalid credentials")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Check if organization is blocked
@@ -257,6 +305,9 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     user.last_login = datetime.utcnow()
     db.commit()
     
+    # Log successful login
+    logger.info(f"Successful login - Username: {user.username}, User ID: {user.id}, IP: {client_ip}")
+    
     access_token = create_access_token(
         data={
             "user_id": user.id,
@@ -264,6 +315,16 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             "role": user.role.value,
             "organization_id": user.organization_id
         }
+    )
+    
+    # Set HTTPOnly secure cookie
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,  # Prevents JavaScript access (XSS protection)
+        secure=False,    # Set to True in production with HTTPS
+        samesite="lax",  # CSRF protection
+        max_age=86400    # 24 hours
     )
     
     org_info = None
@@ -292,8 +353,14 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     )
 
 @app.post("/api/auth/login/verify-2fa", response_model=TokenResponse, tags=["Authentication"])
-async def login_verify_2fa(login_data: Login2FARequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")  # Max 5 verification attempts per minute per IP
+async def login_verify_2fa(request: Request, login_data: Login2FARequest, response: Response, db: Session = Depends(get_db)):
     """Verify 2FA code and complete login"""
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Log 2FA verification attempt
+    logger.info(f"2FA verification attempt - Username: {login_data.username}, IP: {client_ip}")
+    
     # Authenticate user with username and password
     user = authenticate_user(
         db, 
@@ -303,6 +370,7 @@ async def login_verify_2fa(login_data: Login2FARequest, db: Session = Depends(ge
     )
     
     if not user:
+        logger.warning(f"Failed 2FA verification - Username: {login_data.username}, IP: {client_ip}, Reason: Invalid credentials")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Check if user has 2FA enabled
@@ -315,6 +383,7 @@ async def login_verify_2fa(login_data: Login2FARequest, db: Session = Depends(ge
     
     totp = pyotp.TOTP(user.two_fa_secret)
     if not totp.verify(login_data.totp_code, valid_window=1):
+        logger.warning(f"Failed 2FA verification - Username: {login_data.username}, IP: {client_ip}, Reason: Invalid TOTP code")
         raise HTTPException(status_code=401, detail="Invalid 2FA code")
     
     # Check if organization is blocked
@@ -330,6 +399,9 @@ async def login_verify_2fa(login_data: Login2FARequest, db: Session = Depends(ge
     user.last_login = datetime.utcnow()
     db.commit()
     
+    # Log successful 2FA login
+    logger.info(f"Successful 2FA login - Username: {user.username}, User ID: {user.id}, IP: {client_ip}")
+    
     access_token = create_access_token(
         data={
             "user_id": user.id,
@@ -337,6 +409,16 @@ async def login_verify_2fa(login_data: Login2FARequest, db: Session = Depends(ge
             "role": user.role.value,
             "organization_id": user.organization_id
         }
+    )
+    
+    # Set HTTPOnly secure cookie
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,  # Prevents JavaScript access (XSS protection)
+        secure=False,    # Set to True in production with HTTPS
+        samesite="lax",  # CSRF protection
+        max_age=86400    # 24 hours
     )
     
     org_info = None
@@ -363,6 +445,12 @@ async def login_verify_2fa(login_data: Login2FARequest, db: Session = Depends(ge
             "organization": org_info
         }
     )
+
+@app.post("/api/auth/logout", tags=["Authentication"])
+async def logout(response: Response):
+    """Logout by clearing the HTTPOnly cookie"""
+    response.delete_cookie(key="access_token")
+    return {"message": "Logged out successfully"}
 
 @app.get("/api/auth/me", tags=["Authentication"])
 async def get_current_user_info(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
