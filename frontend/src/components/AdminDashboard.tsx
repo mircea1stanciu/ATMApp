@@ -44,6 +44,7 @@ interface Stats {
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isDark, setIsDark] = useState(false);
   const [stats, setStats] = useState<Stats>({
     total_organizations: 0,
     total_users: 0,
@@ -95,6 +96,15 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     checkAuthentication();
+  }, []);
+
+  useEffect(() => {
+    // Initialize dark mode from localStorage
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const shouldBeDark = savedTheme === 'dark' || (!savedTheme && prefersDark);
+    setIsDark(shouldBeDark);
+    document.documentElement.classList.toggle('dark', shouldBeDark);
   }, []);
 
   useEffect(() => {
@@ -661,6 +671,13 @@ export default function AdminDashboard() {
     router.push('/login');
   };
 
+  const toggleDarkMode = () => {
+    const newTheme = !isDark;
+    setIsDark(newTheme);
+    localStorage.setItem('theme', newTheme ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', newTheme);
+  };
+
   // Helper function to get role priority (lower number = higher priority)
   const getRolePriority = (role: string): number => {
     const priorities: { [key: string]: number } = {
@@ -800,6 +817,13 @@ export default function AdminDashboard() {
                 <span className="hidden md:inline lg:hidden text-green-600">💻 Desktop</span>
                 <span className="hidden lg:inline text-blue-600">🖥️ Large</span>
               </div>
+              <button
+                onClick={toggleDarkMode}
+                className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+                title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {isDark ? '☀️' : '🌙'}
+              </button>
               <span className="hidden sm:inline text-xs sm:text-sm text-gray-900 dark:text-white font-medium">
                 {currentUser?.full_name || currentUser?.username}
               </span>

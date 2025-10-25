@@ -23,6 +23,7 @@ export default function CommunityDashboard({
   capabilities
 }: CommunityDashboardProps) {
   const [user, setUser] = useState<any>(null);
+  const [isDark, setIsDark] = useState(false);
   const [stats, setStats] = useState({
     totalChats: 0,
     thisWeek: 0,
@@ -36,6 +37,13 @@ export default function CommunityDashboard({
       setUser(JSON.parse(userStr));
     }
 
+    // Initialize dark mode from localStorage
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const shouldBeDark = savedTheme === 'dark' || (!savedTheme && prefersDark);
+    setIsDark(shouldBeDark);
+    document.documentElement.classList.toggle('dark', shouldBeDark);
+
     // TODO: Fetch real stats from API
     setStats({
       totalChats: 24,
@@ -44,23 +52,39 @@ export default function CommunityDashboard({
     });
   }, []);
 
+  const toggleDarkMode = () => {
+    const newTheme = !isDark;
+    setIsDark(newTheme);
+    localStorage.setItem('theme', newTheme ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', newTheme);
+  };
+
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 sm:p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Welcome Header */}
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center gap-4 mb-4">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl ${communityColor} text-white`}>
-              {communityIcon}
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-4">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl ${communityColor} text-white`}>
+                {communityIcon}
+              </div>
+              <div className="flex-1">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {communityName} Dashboard
+                </h1>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Welcome back, {user?.full_name || user?.username || 'User'}! 👋
+                </p>
+              </div>
             </div>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {communityName} Dashboard
-              </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Welcome back, {user?.full_name || user?.username || 'User'}! 👋
-              </p>
-            </div>
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDark ? '☀️' : '🌙'}
+            </button>
           </div>
 
           {/* Tab Navigation */}
