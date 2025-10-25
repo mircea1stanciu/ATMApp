@@ -348,6 +348,13 @@ export default function CommunityPage() {
       setActiveCommunityId(communityId)
     }
   }, [communityId, setActiveCommunityId])
+
+  // Close chat when leaving the community page
+  useEffect(() => {
+    return () => {
+      closeChat()
+    }
+  }, [])
   
   useEffect(() => {
     // Check if user has access to this community
