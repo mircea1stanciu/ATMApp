@@ -203,15 +203,17 @@ export default function Header({ currentCommunity, onClear, onShowExamples, onLo
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
-            {/* Settings Link - AI Model Selection - Only for super_admin, org_admin, community_lead */}
-            {isAuthenticated && ['super_admin', 'org_admin', 'community_lead'].includes(userRole) && (
+            {/* Settings Link - For all authenticated users */}
+            {isAuthenticated && (
               <Link
                 href="/settings"
                 className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200 relative"
-                title="Settings - AI Models & Preferences"
+                title="Settings & Preferences"
               >
                 <Sparkles size={18} />
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+                {['super_admin', 'org_admin', 'community_lead'].includes(userRole) && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+                )}
               </Link>
             )}
 

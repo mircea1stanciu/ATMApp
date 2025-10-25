@@ -13,7 +13,7 @@ interface UserData {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'general' | 'ai-models' | 'account'>('ai-models');
+  const [activeTab, setActiveTab] = useState<'general' | 'ai-models' | 'account'>('general');
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,12 +24,14 @@ export default function SettingsPage() {
         const userData = JSON.parse(userStr);
         setUser(userData);
         
-        // Check if user has access to AI Model Selection
+        // Set default tab based on user role
         const allowedRoles = ['super_admin', 'org_admin', 'community_lead'];
         if (!allowedRoles.includes(userData.role)) {
-          // Redirect users without permission
-          router.push('/dashboard');
-          return;
+          // Regular users default to 'general' tab
+          setActiveTab('general');
+        } else {
+          // Admins and community leads default to 'ai-models' tab
+          setActiveTab('ai-models');
         }
       } catch (e) {
         router.push('/login');
@@ -79,17 +81,20 @@ export default function SettingsPage() {
           {/* Sidebar */}
           <div className="lg:col-span-1">
             <nav className="space-y-1">
-              <button
-                onClick={() => setActiveTab('ai-models')}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'ai-models'
-                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                <Sparkles className="w-5 h-5" />
-                AI Models
-              </button>
+              {/* AI Models Tab - Only for super_admin, org_admin, community_lead */}
+              {user && ['super_admin', 'org_admin', 'community_lead'].includes(user.role) && (
+                <button
+                  onClick={() => setActiveTab('ai-models')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    activeTab === 'ai-models'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <Sparkles className="w-5 h-5" />
+                  AI Models
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab('general')}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
