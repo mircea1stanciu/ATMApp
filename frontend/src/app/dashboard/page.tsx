@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 import Link from 'next/link';
 import { MessageSquare, Clock, TrendingUp, Users } from 'lucide-react';
 
@@ -237,6 +238,7 @@ export default function UserDashboard() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

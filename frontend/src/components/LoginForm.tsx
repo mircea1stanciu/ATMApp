@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Footer from './Footer';
 import { apiService } from '@/services/api';
 
 export default function LoginForm() {
@@ -48,21 +49,22 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            🤖 UnifiedWork
-          </h1>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            Welcome Back
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Sign in to continue your work
-          </p>
-        </div>
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              🤖 UnifiedWork
+            </h1>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Welcome Back
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Sign in to continue your work
+            </p>
+          </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6 bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
+          <form onSubmit={handleSubmit} className="mt-8 space-y-6 bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
           <div className="space-y-4">
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -141,8 +143,10 @@ export default function LoginForm() {
               Admin: <code className="bg-blue-100 dark:bg-blue-800 px-1 py-0.5 rounded">admin</code> / <code className="bg-blue-100 dark:bg-blue-800 px-1 py-0.5 rounded">admin123</code>
             </p>
           </div>
-        </form>
+          </form>
+        </div>
       </div>
+      <Footer />
     </div>
   );
 }

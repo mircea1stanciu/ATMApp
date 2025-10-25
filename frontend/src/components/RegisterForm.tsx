@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Footer from './Footer';
 
 export default function RegisterForm() {
   const [activeTab, setActiveTab] = useState('admin');
@@ -438,6 +439,7 @@ export default function RegisterForm() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
