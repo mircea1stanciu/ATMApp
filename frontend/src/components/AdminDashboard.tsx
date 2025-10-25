@@ -719,6 +719,18 @@ export default function AdminDashboard() {
     return sorted;
   };
 
+  // Check if any user (that should have communities) has assigned communities
+  const hasAnyCommunitiesAssigned = () => {
+    return users.some(user => {
+      if (user.role === 'community_lead' || user.role === 'user') {
+        return user.assigned_communities && 
+               Array.isArray(user.assigned_communities) && 
+               user.assigned_communities.length > 0;
+      }
+      return false;
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1167,7 +1179,9 @@ export default function AdminDashboard() {
                               Role
                               <span className="ml-1 text-[10px] sm:text-xs text-gray-400">(sorted)</span>
                             </th>
-                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Communities</th>
+                            {hasAnyCommunitiesAssigned() && (
+                              <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Communities</th>
+                            )}
                             <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Status</th>
                             <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Last Login</th>
                             <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Actions</th>
@@ -1194,25 +1208,27 @@ export default function AdminDashboard() {
                                   {user.role.replace('_', ' ').toUpperCase()}
                                 </span>
                               </td>
-                              <td className="py-3">
-                                {
-                                  (() => {
-                                    console.log(`🔍 Rendering communities for user ${user.username}: role=${user.role}, communities=${user.assigned_communities}, isArray=${Array.isArray(user.assigned_communities)}, length=${user.assigned_communities?.length || 0}`);
-                                    if ((user.role === 'community_lead' || user.role === 'user') && user.assigned_communities && Array.isArray(user.assigned_communities) && user.assigned_communities.length > 0) {
-                                      return (
-                                        <div className="flex gap-1 flex-wrap max-w-[200px]">
-                                          {user.assigned_communities.map((comm: string) => (
-                                            <span key={comm} className="px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                              {comm}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      );
-                                    }
-                                    return <span className="text-xs sm:text-sm text-gray-400">-</span>;
-                                  })()
-                                }
-                              </td>
+                              {hasAnyCommunitiesAssigned() && (
+                                <td className="py-3">
+                                  {
+                                    (() => {
+                                      console.log(`🔍 Rendering communities for user ${user.username}: role=${user.role}, communities=${user.assigned_communities}, isArray=${Array.isArray(user.assigned_communities)}, length=${user.assigned_communities?.length || 0}`);
+                                      if ((user.role === 'community_lead' || user.role === 'user') && user.assigned_communities && Array.isArray(user.assigned_communities) && user.assigned_communities.length > 0) {
+                                        return (
+                                          <div className="flex gap-1 flex-wrap max-w-[200px]">
+                                            {user.assigned_communities.map((comm: string) => (
+                                              <span key={comm} className="px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                {comm}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        );
+                                      }
+                                      return <span className="text-xs sm:text-sm text-gray-400">-</span>;
+                                    })()
+                                  }
+                                </td>
+                              )}
                               <td className="py-3">
                                 <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium ${
                                   user.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
