@@ -433,6 +433,11 @@ async def register_org_admin(register_data: dict, db: Session = Depends(get_db))
 async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
     """Register as regular user within an organization"""
     
+    # Debug logging
+    print(f"[REGISTER-USER DEBUG] Received payload: {register_data}")
+    print(f"[REGISTER-USER DEBUG] Role: {register_data.get('role')}")
+    print(f"[REGISTER-USER DEBUG] Assigned Communities: {register_data.get('assigned_communities')}")
+    
     # Validate required fields
     required_fields = ["organization_slug", "username", "email", "password", "full_name"]
     for field in required_fields:
@@ -482,6 +487,8 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
     if (user_role == UserRole.COMMUNITY_LEAD or user_role == UserRole.USER) and register_data.get("assigned_communities"):
         import json
         assigned_communities = json.dumps(register_data["assigned_communities"])
+        print(f"[REGISTER-USER DEBUG] Communities before JSON dump: {register_data.get('assigned_communities')}")
+        print(f"[REGISTER-USER DEBUG] Communities after JSON dump: {assigned_communities}")
     
     # Create regular user
     new_user = User(
@@ -494,6 +501,9 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
         organization_id=org.id,
         is_active=True
     )
+    
+    print(f"[REGISTER-USER DEBUG] New user role: {new_user.role}")
+    print(f"[REGISTER-USER DEBUG] New user assigned_communities: {new_user.assigned_communities}")
     
     db.add(new_user)
     db.commit()
@@ -510,6 +520,9 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
         }
     )
     
+    assigned_communities_response = json.loads(new_user.assigned_communities) if new_user.assigned_communities else []
+    print(f"[REGISTER-USER DEBUG] Response assigned_communities: {assigned_communities_response}")
+    
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
@@ -519,7 +532,7 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
             "email": new_user.email,
             "full_name": new_user.full_name,
             "role": new_user.role.value,
-            "assigned_communities": json.loads(new_user.assigned_communities) if new_user.assigned_communities else [],
+            "assigned_communities": assigned_communities_response,
             "organization": {
                 "id": org.id,
                 "name": org.name,
