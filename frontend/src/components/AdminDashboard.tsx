@@ -1123,8 +1123,18 @@ export default function AdminDashboard() {
                           ))}
                         </select>
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        Showing {getFilteredAndSortedUsers().length} of {users.length} users
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                          Showing {getFilteredAndSortedUsers().length} of {users.length} users
+                        </div>
+                        {selectedOrgFilter !== 'all' && organizations.find(org => org.id === parseInt(selectedOrgFilter)) && (
+                          <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900 rounded-md border border-blue-200 dark:border-blue-700">
+                            <span className="text-[10px] sm:text-xs font-medium text-blue-600 dark:text-blue-300">Slug:</span>
+                            <code className="text-[10px] sm:text-xs font-mono text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-800 px-1.5 py-0.5 rounded">
+                              {organizations.find(org => org.id === parseInt(selectedOrgFilter))?.slug}
+                            </code>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
