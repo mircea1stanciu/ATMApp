@@ -150,9 +150,18 @@ export default function UserDashboard() {
               )}
             </div>
             
-            {/* Community Leads and regular Users have access to all communities */}
+            {/* Filter communities: admins see all, regular users/leads see only assigned */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-                  {communities.map((community) => (
+                  {communities
+                    .filter((community) => {
+                      // Admins see all communities
+                      if (user.role === 'org_admin' || user.role === 'super_admin') {
+                        return true;
+                      }
+                      // Regular users and community leads see only assigned communities
+                      return user.assigned_communities && user.assigned_communities.includes(community.id);
+                    })
+                    .map((community) => (
                     <a
                       key={community.id}
                       href={`/community/${community.id}`}
