@@ -66,7 +66,7 @@ class MessagingService {
   constructor() {
     this.baseUrl = process.env.NODE_ENV === 'production' 
       ? 'https://api.unifiedwork.com' 
-      : 'http://localhost:8001';
+      : 'http://localhost:8002';
   }
 
   private getAuthHeaders(): Record<string, string> {

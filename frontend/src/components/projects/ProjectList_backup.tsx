@@ -62,7 +62,7 @@ export default function ProjectList({ communityId, onProjectClick, onCreateProje
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:8001/api/projects/community/${communityId}`,
+        `http://localhost:8002/api/projects/community/${communityId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -92,7 +92,7 @@ export default function ProjectList({ communityId, onProjectClick, onCreateProje
       setDeletingId(projectId);
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:8001/api/projects/${projectId}`,
+        `http://localhost:8002/api/projects/${projectId}`,
         {
           method: 'DELETE',
           headers: {

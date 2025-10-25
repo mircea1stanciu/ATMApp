@@ -57,7 +57,7 @@ export default function MessengerView() {
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
 
   // API base URL
-  const API_BASE = 'http://localhost:8001';
+  const API_BASE = 'http://localhost:8002';
 
   // Get auth token
   const getAuthToken = () => {
@@ -199,7 +199,7 @@ export default function MessengerView() {
   const connectWebSocket = () => {
     if (!currentUser) return;
 
-    const ws = new WebSocket(`ws://localhost:8001/api/v1/messaging/ws/${currentUser.id}`);
+    const ws = new WebSocket(`ws://localhost:8002/api/v1/messaging/ws/${currentUser.id}`);
     
     ws.onopen = () => {
       console.log('WebSocket connected');

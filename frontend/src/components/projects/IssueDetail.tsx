@@ -85,7 +85,7 @@ export default function IssueDetail({ projectId, issueId, onClose, onUpdate }: I
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:8001/api/projects/${projectId}/issues/${issueId}`,
+        `http://localhost:8002/api/projects/${projectId}/issues/${issueId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -108,7 +108,7 @@ export default function IssueDetail({ projectId, issueId, onClose, onUpdate }: I
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:8001/api/projects/${projectId}/issues/${issueId}`,
+        `http://localhost:8002/api/projects/${projectId}/issues/${issueId}`,
         {
           method: 'PATCH',
           headers: {
@@ -134,7 +134,7 @@ export default function IssueDetail({ projectId, issueId, onClose, onUpdate }: I
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:8001/api/projects/${projectId}/issues/${issueId}/comments`,
+        `http://localhost:8002/api/projects/${projectId}/issues/${issueId}/comments`,
         {
           method: 'POST',
           headers: {

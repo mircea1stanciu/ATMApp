@@ -61,7 +61,7 @@ export default function RegisterForm() {
     }
 
     try {
-      const response = await fetch('http://localhost:8001/api/auth/register-org-admin', {
+      const response = await fetch('http://localhost:8002/api/auth/register-org-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -104,7 +104,7 @@ export default function RegisterForm() {
     }
 
     try {
-      const response = await fetch('http://localhost:8001/api/auth/register-user', {
+      const response = await fetch('http://localhost:8002/api/auth/register-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

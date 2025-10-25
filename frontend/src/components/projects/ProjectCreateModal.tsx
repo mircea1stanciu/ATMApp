@@ -47,7 +47,7 @@ export default function ProjectCreateModal({ communityId, onClose, onCreate }: P
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/projects/', {
+      const response = await fetch('http://localhost:8002/api/projects/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -62,7 +62,7 @@ export default function ProjectList({ onProjectClick, onCreateProject }: Project
       const token = localStorage.getItem('token');
       // Fetch all organization projects instead of community-specific
       const response = await fetch(
-        `http://localhost:8001/api/projects/organization`,
+        `http://localhost:8002/api/projects/organization`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -92,7 +92,7 @@ export default function ProjectList({ onProjectClick, onCreateProject }: Project
       setDeletingId(projectId);
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:8001/api/projects/${projectId}`,
+        `http://localhost:8002/api/projects/${projectId}`,
         {
           method: 'DELETE',
           headers: {

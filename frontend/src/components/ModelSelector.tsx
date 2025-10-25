@@ -35,7 +35,7 @@ export default function ModelSelector({ onModelSelect, currentModel }: ModelSele
   const loadModels = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/ai-models', {
+      const response = await fetch('http://localhost:8002/api/ai-models', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -54,7 +54,7 @@ export default function ModelSelector({ onModelSelect, currentModel }: ModelSele
   const loadPreferences = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/user/preferences', {
+      const response = await fetch('http://localhost:8002/api/user/preferences', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -71,7 +71,7 @@ export default function ModelSelector({ onModelSelect, currentModel }: ModelSele
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:8001/api/user/preferences/model?model_id=${selectedModel}&temperature=${temperature}`,
+        `http://localhost:8002/api/user/preferences/model?model_id=${selectedModel}&temperature=${temperature}`,
         {
           method: 'POST',
           headers: {

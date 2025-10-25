@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+const API_HOST = process.env.NEXT_PUBLIC_API_HOST || 'localhost';
+const API_PORT = process.env.NEXT_PUBLIC_API_PORT || '8002';
+const API_BASE_URL = `http://${API_HOST}:${API_PORT}`;
+
 interface Organization {
   id: number;
   name: string;
@@ -62,7 +66,12 @@ export default function AdminDashboard() {
     role: '',
     assigned_communities: [] as string[],
     full_name: '',
-    is_active: true
+    username: '',
+    email: '',
+    password: '',
+    confirm_password: '',
+    is_active: true,
+    organization_id: 0
   });
   const [createUserForm, setCreateUserForm] = useState({
     username: '',
@@ -102,7 +111,7 @@ export default function AdminDashboard() {
     }
 
     try {
-      const response = await fetch('http://localhost:8001/api/auth/me', {
+      const response = await fetch('http://localhost:8002/api/auth/me', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -149,23 +158,45 @@ export default function AdminDashboard() {
       ...options.headers
     };
 
-    const response = await fetch(`http://localhost:8001${endpoint}`, {
-      ...options,
-      headers
-    });
+    try {
+      console.log(`[API] ${options.method || 'GET'} ${API_BASE_URL}${endpoint}`);
+      
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers
+      });
 
-    if (response.status === 401) {
-      localStorage.removeItem('token');
-      router.push('/login');
-      return;
+      console.log(`[API] Response status: ${response.status}`);
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        router.push('/login');
+        return;
+      }
+
+      if (!response.ok) {
+        let errorMessage = 'Request failed';
+        try {
+          const error = await response.json();
+          errorMessage = error.detail || error.message || error.error || 'Request failed';
+        } catch (e) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        console.error(`[API] Error: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log(`[API] Success`);
+      return data;
+    } catch (error) {
+      console.error(`[API] Exception:`, error);
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new Error(`Network error: Cannot reach backend at ${API_BASE_URL}. Make sure the backend is running on ${API_HOST}:${API_PORT}.`);
+      }
+      throw error;
     }
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-      throw new Error(error.detail || 'Request failed');
-    }
-
-    return response.json();
   };
 
   const loadOverview = async () => {
@@ -375,7 +406,7 @@ export default function AdminDashboard() {
       }
       
       try {
-        const response = await fetch('http://localhost:8001/api/auth/register-org-admin', {
+        const response = await fetch('http://localhost:8002/api/auth/register-org-admin', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -427,7 +458,7 @@ export default function AdminDashboard() {
       }
       
       try {
-        const response = await fetch('http://localhost:8001/api/auth/register-user', {
+        const response = await fetch('http://localhost:8002/api/auth/register-user', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -528,6 +559,18 @@ export default function AdminDashboard() {
       alert('❌ Community Leads must have at least one assigned community');
       return;
     }
+
+    // Validate password if provided
+    if (editUserForm.password && editUserForm.password.length < 8) {
+      alert('❌ Password must be at least 8 characters');
+      return;
+    }
+
+    // Validate password confirmation
+    if (editUserForm.password && editUserForm.password !== editUserForm.confirm_password) {
+      alert('❌ Passwords do not match. Please confirm your password.');
+      return;
+    }
     
     try {
       // Get organization ID from the user being edited
@@ -538,9 +581,30 @@ export default function AdminDashboard() {
         return;
       }
 
+      // Build update data based on user role
+      // Super admins can update all fields including role
+      // Org admins can only update certain fields, but NOT change to org_admin role
+      const updateData: any = {
+        full_name: editUserForm.full_name,
+        username: editUserForm.username,
+        email: editUserForm.email,
+        is_active: editUserForm.is_active,
+        assigned_communities: editUserForm.assigned_communities,
+        ...(editUserForm.password && { password: editUserForm.password })
+      };
+
+      // Only super admins can change role
+      if (currentUser?.role === 'super_admin') {
+        updateData.role = editUserForm.role;
+        // Only super admins can set organization_id
+        if (editUserForm.role === 'org_admin' && editUserForm.organization_id) {
+          updateData.organization_id = editUserForm.organization_id;
+        }
+      }
+
       const result = await apiCall(`/api/organizations/${orgId}/users/${selectedUser.id}`, {
         method: 'PATCH',
-        body: JSON.stringify(editUserForm)
+        body: JSON.stringify(updateData)
       });
 
       alert(`✅ User updated successfully!\n\nUsername: ${result.user.username}\nRole: ${result.user.role}\nStatus: ${result.user.is_active ? 'Active' : 'Inactive'}`);
@@ -551,7 +615,12 @@ export default function AdminDashboard() {
         role: '',
         assigned_communities: [],
         full_name: '',
-        is_active: true
+        username: '',
+        email: '',
+        password: '',
+        confirm_password: '',
+        is_active: true,
+        organization_id: 0
       });
       
       // Reload users
@@ -1001,7 +1070,7 @@ export default function AdminDashboard() {
                         <select
                           value={selectedOrgFilter}
                           onChange={(e) => setSelectedOrgFilter(e.target.value)}
-                          className="w-full sm:w-auto px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                          className="box-border w-full sm:w-auto px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                         >
                           <option value="all">All Organizations</option>
                           {organizations.map((org) => (
@@ -1097,7 +1166,12 @@ export default function AdminDashboard() {
                                         role: user.role,
                                         assigned_communities: Array.isArray(user.assigned_communities) ? user.assigned_communities : [],
                                         full_name: user.full_name,
-                                        is_active: user.is_active
+                                        username: user.username,
+                                        email: user.email,
+                                        password: '',
+                                        confirm_password: '',
+                                        is_active: user.is_active,
+                                        organization_id: user.organization?.id || 0
                                       });
                                       setShowEditUserModal(true);
                                     }}
@@ -1140,7 +1214,7 @@ export default function AdminDashboard() {
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">📍 Base URL</h3>
                 <div className="bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 rounded-lg font-mono text-xs sm:text-sm">
-                  <code className="text-blue-600 dark:text-blue-400">http://localhost:8001</code>
+                  <code className="text-blue-600 dark:text-blue-400">http://localhost:8002</code>
                 </div>
                 <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   All API endpoints are relative to this base URL
@@ -1367,7 +1441,7 @@ export default function AdminDashboard() {
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">🧪 Quick Links</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   <a
-                    href="http://localhost:8001/docs"
+                    href="http://localhost:8002/docs"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all"
@@ -1379,7 +1453,7 @@ export default function AdminDashboard() {
                     </div>
                   </a>
                   <a
-                    href="http://localhost:8001/redoc"
+                    href="http://localhost:8002/redoc"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all"
@@ -1558,7 +1632,7 @@ export default function AdminDashboard() {
                     setCreateOrgForm(prev => ({ ...prev, name, slug }));
                   }}
                   placeholder="Acme Corporation"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
               </div>
               <div>
@@ -1572,7 +1646,7 @@ export default function AdminDashboard() {
                   value={createOrgForm.slug}
                   onChange={(e) => setCreateOrgForm(prev => ({ ...prev, slug: e.target.value }))}
                   placeholder="acme-corp"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Example: "{createOrgForm.slug || 'acme-corp'}"
@@ -1586,7 +1660,7 @@ export default function AdminDashboard() {
                   value={createOrgForm.description}
                   onChange={(e) => setCreateOrgForm(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Brief description of the organization"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   rows={3}
                 />
               </div>
@@ -1598,7 +1672,7 @@ export default function AdminDashboard() {
                   required
                   value={createOrgForm.subscription_plan}
                   onChange={(e) => setCreateOrgForm(prev => ({ ...prev, subscription_plan: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="free">FREE (5 users, 100 chats)</option>
                   <option value="basic">BASIC (10 users, 1,000 chats)</option>
@@ -1650,7 +1724,7 @@ export default function AdminDashboard() {
                   required
                   value={newPlan}
                   onChange={(e) => setNewPlan(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="">Select a plan...</option>
                   <option value="free">FREE - 10 users, 1,000 chats/month</option>
@@ -1690,11 +1764,13 @@ export default function AdminDashboard() {
       {/* Create User Modal */}
       {showCreateUserModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full m-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Create New User
-            </h3>
-            <form onSubmit={handleCreateUser} className="space-y-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full m-4 max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Create New User
+              </h3>
+            </div>
+            <form onSubmit={handleCreateUser} className="space-y-4 overflow-y-auto flex-1 px-6 py-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Username *
@@ -1706,7 +1782,7 @@ export default function AdminDashboard() {
                   value={createUserForm.username}
                   onChange={(e) => setCreateUserForm(prev => ({ ...prev, username: e.target.value }))}
                   placeholder="john_doe"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
               <div>
@@ -1719,7 +1795,7 @@ export default function AdminDashboard() {
                   value={createUserForm.email}
                   onChange={(e) => setCreateUserForm(prev => ({ ...prev, email: e.target.value }))}
                   placeholder="john@example.com"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
               <div>
@@ -1732,7 +1808,7 @@ export default function AdminDashboard() {
                   value={createUserForm.full_name}
                   onChange={(e) => setCreateUserForm(prev => ({ ...prev, full_name: e.target.value }))}
                   placeholder="John Doe"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
               <div>
@@ -1746,7 +1822,7 @@ export default function AdminDashboard() {
                   value={createUserForm.password}
                   onChange={(e) => setCreateUserForm(prev => ({ ...prev, password: e.target.value }))}
                   placeholder="At least 8 characters"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
               <div>
@@ -1760,7 +1836,7 @@ export default function AdminDashboard() {
                   value={createUserForm.confirm_password}
                   onChange={(e) => setCreateUserForm(prev => ({ ...prev, confirm_password: e.target.value }))}
                   placeholder="Re-enter your password"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
               {currentUser?.role === 'super_admin' && (
@@ -1778,7 +1854,7 @@ export default function AdminDashboard() {
                       organization_slug: '',
                       access_token: ''
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="user">User</option>
                     <option value="community_lead">Community Lead</option>
@@ -1797,7 +1873,7 @@ export default function AdminDashboard() {
                     value={createUserForm.access_token}
                     onChange={(e) => setCreateUserForm(prev => ({ ...prev, access_token: e.target.value }))}
                     placeholder="Paste the organization access token"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-mono text-sm"
+                    className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-mono text-sm"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     The access token that determines which organization this admin belongs to
@@ -1815,7 +1891,7 @@ export default function AdminDashboard() {
                     value={createUserForm.organization_slug}
                     onChange={(e) => setCreateUserForm(prev => ({ ...prev, organization_slug: e.target.value }))}
                     placeholder="organization-slug"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     The slug (URL identifier) of the organization this user belongs to
@@ -1847,7 +1923,7 @@ export default function AdminDashboard() {
                     required
                     value={createUserForm.role}
                     onChange={(e) => setCreateUserForm(prev => ({ ...prev, role: e.target.value, assigned_communities: [] }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="user">User</option>
                     <option value="community_lead">Community Lead</option>
@@ -1904,7 +1980,7 @@ export default function AdminDashboard() {
                   </p>
                 </div>
               )}
-              <div className="flex gap-3 mt-6">
+              <div className="flex gap-3 mt-6 pt-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -1940,31 +2016,38 @@ export default function AdminDashboard() {
       {/* Edit User Modal */}
       {showEditUserModal && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full m-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Edit User
-            </h3>
-            <form onSubmit={handleUpdateUser} className="space-y-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full m-4 max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Edit User
+              </h3>
+            </div>
+            <form onSubmit={handleUpdateUser} className="space-y-4 overflow-y-auto flex-1 px-6 py-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Username
+                  Username *
                 </label>
                 <input
                   type="text"
-                  value={selectedUser.username}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-500 cursor-not-allowed"
+                  required
+                  minLength={3}
+                  value={editUserForm.username}
+                  onChange={(e) => setEditUserForm(prev => ({ ...prev, username: e.target.value }))}
+                  placeholder="john_doe"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Email
+                  Email *
                 </label>
                 <input
                   type="email"
-                  value={selectedUser.email}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-500 cursor-not-allowed"
+                  required
+                  value={editUserForm.email}
+                  onChange={(e) => setEditUserForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="john@example.com"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
               <div>
@@ -1977,8 +2060,40 @@ export default function AdminDashboard() {
                   value={editUserForm.full_name}
                   onChange={(e) => setEditUserForm(prev => ({ ...prev, full_name: e.target.value }))}
                   placeholder="John Doe"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Password (Leave empty to keep current)
+                </label>
+                <input
+                  type="password"
+                  minLength={8}
+                  value={editUserForm.password}
+                  onChange={(e) => setEditUserForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="At least 8 characters"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Only fill this field if you want to change the password
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  minLength={8}
+                  value={editUserForm.confirm_password}
+                  onChange={(e) => setEditUserForm(prev => ({ ...prev, confirm_password: e.target.value }))}
+                  placeholder="Re-enter your password"
+                  className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Only required if changing the password
+                </p>
               </div>
               {currentUser?.role === 'super_admin' && (
                 <div>
@@ -1989,7 +2104,7 @@ export default function AdminDashboard() {
                     required
                     value={editUserForm.role}
                     onChange={(e) => setEditUserForm(prev => ({ ...prev, role: e.target.value, assigned_communities: [] }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="user">User</option>
                     <option value="community_lead">Community Lead</option>
@@ -2006,10 +2121,30 @@ export default function AdminDashboard() {
                     required
                     value={editUserForm.role}
                     onChange={(e) => setEditUserForm(prev => ({ ...prev, role: e.target.value, assigned_communities: [] }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="user">User</option>
                     <option value="community_lead">Community Lead</option>
+                  </select>
+                </div>
+              )}
+              {currentUser?.role === 'super_admin' && editUserForm.role === 'org_admin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Organization *
+                  </label>
+                  <select
+                    required
+                    value={editUserForm.organization_id}
+                    onChange={(e) => setEditUserForm(prev => ({ ...prev, organization_id: parseInt(e.target.value) }))}
+                    className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value={0}>Select an organization...</option>
+                    {organizations.map(org => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               )}
@@ -2072,7 +2207,7 @@ export default function AdminDashboard() {
                   Inactive users cannot log in
                 </p>
               </div>
-              <div className="flex gap-3 mt-6">
+              <div className="flex gap-3 mt-6 pt-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -2082,7 +2217,12 @@ export default function AdminDashboard() {
                       role: '',
                       assigned_communities: [],
                       full_name: '',
-                      is_active: true
+                      username: '',
+                      email: '',
+                      password: '',
+                      confirm_password: '',
+                      is_active: true,
+                      organization_id: 0
                     });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"

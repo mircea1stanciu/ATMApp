@@ -58,7 +58,7 @@ export default function KanbanBoard({ projectId, onIssueClick, onCreateIssue }: 
   const fetchIssues = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8001/api/projects/${projectId}/issues`, {
+      const response = await fetch(`http://localhost:8002/api/projects/${projectId}/issues`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -107,7 +107,7 @@ export default function KanbanBoard({ projectId, onIssueClick, onCreateIssue }: 
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:8001/api/projects/${projectId}/issues/${draggedIssue.id}/move`,
+        `http://localhost:8002/api/projects/${projectId}/issues/${draggedIssue.id}/move`,
         {
           method: 'POST',
           headers: {

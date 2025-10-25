@@ -1,7 +1,7 @@
 # UnifiedWork Backend - AI-Powered Unified Workspace
 # Comprehensive multi-tenant SaaS platform for tech teams
 
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException, Depends, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -23,7 +23,8 @@ from core.auth import (
     get_organization_from_subdomain,
     get_org_admin_user,
     get_community_lead_user,
-    get_super_admin_user
+    get_super_admin_user,
+    pwd_context
 )
 from agents.simple_qa_agent import SimpleQAAgent
 from agents.simple_backend_agent import SimpleBackendAgent
@@ -1274,66 +1275,125 @@ async def create_organization_user(
 async def update_organization_user(
     org_id: int,
     user_id: int,
-    user_data: dict,
+    user_data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_org_admin_user)
 ):
     """Update a user's role and assigned communities (Org Admin or Super Admin)"""
-    # Verify user has permission
-    if current_user.role != UserRole.SUPER_ADMIN:
-        if current_user.organization_id != org_id:
-            raise HTTPException(status_code=403, detail="Not authorized to update users in this organization")
-    
-    # Get user
-    user = db.query(User).filter(User.id == user_id, User.organization_id == org_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Update role if provided
-    if user_data.get("role"):
-        role_value = user_data["role"].upper()
-        if role_value in ["ORG_ADMIN", "COMMUNITY_LEAD", "USER"]:
-            new_role = UserRole[role_value]
-            
-            # Only super admins can create/update org admins
-            if new_role == UserRole.ORG_ADMIN and current_user.role != UserRole.SUPER_ADMIN:
-                raise HTTPException(status_code=403, detail="Only super admins can create org admins")
-            
-            user.role = new_role
-    
-    # Update assigned communities for community leads and regular users
-    if user_data.get("assigned_communities") is not None:
-        if user.role == UserRole.COMMUNITY_LEAD or user.role == UserRole.USER:
-            import json
-            user.assigned_communities = json.dumps(user_data["assigned_communities"])
+    try:
+        # Debug: Log the received data
+        print(f"[PATCH DEBUG] Received user_data: {user_data}")
+        print(f"[PATCH DEBUG] Password field: {user_data.get('password', 'NOT PROVIDED')}")
+        print(f"[PATCH DEBUG] Password length: {len(user_data.get('password', '')) if user_data.get('password') else 'N/A'}")
+        
+        # Verify user has permission
+        if current_user.role != UserRole.SUPER_ADMIN:
+            if current_user.organization_id != org_id:
+                raise HTTPException(status_code=403, detail="Not authorized to update users in this organization")
+        
+        # Get user - Super admins can update any user, org admins only their org's users
+        if current_user.role == UserRole.SUPER_ADMIN:
+            user = db.query(User).filter(User.id == user_id).first()
         else:
-            # Org admins and super admins don't have assigned communities
-            user.assigned_communities = None
-    
-    # Update other fields if provided
-    if user_data.get("full_name"):
-        user.full_name = user_data["full_name"]
-    
-    if user_data.get("is_active") is not None:
-        user.is_active = user_data["is_active"]
-    
-    db.commit()
-    db.refresh(user)
-    
-    import json
-    return {
-        "message": "User updated successfully",
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "full_name": user.full_name,
-            "role": user.role.value,
-            "assigned_communities": json.loads(user.assigned_communities) if user.assigned_communities else [],
-            "organization_id": user.organization_id,
-            "is_active": user.is_active
+            user = db.query(User).filter(User.id == user_id, User.organization_id == org_id).first()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update role if provided
+        if user_data.get("role"):
+            role_value = user_data["role"].upper()
+            if role_value in ["ORG_ADMIN", "COMMUNITY_LEAD", "USER"]:
+                new_role = UserRole[role_value]
+                
+                # Only super admins can create/update org admins
+                if new_role == UserRole.ORG_ADMIN and current_user.role != UserRole.SUPER_ADMIN:
+                    raise HTTPException(status_code=403, detail="Only super admins can create org admins")
+                
+                user.role = new_role
+        
+        # Update assigned communities for community leads and regular users
+        if user_data.get("assigned_communities") is not None:
+            if user.role == UserRole.COMMUNITY_LEAD or user.role == UserRole.USER:
+                import json
+                user.assigned_communities = json.dumps(user_data["assigned_communities"])
+            else:
+                # Org admins and super admins don't have assigned communities
+                user.assigned_communities = None
+        
+        # Update other fields if provided
+        if user_data.get("full_name"):
+            user.full_name = user_data["full_name"]
+        
+        if user_data.get("username"):
+            user.username = user_data["username"]
+        
+        if user_data.get("email"):
+            user.email = user_data["email"]
+        
+        if user_data.get("password"):
+            # bcrypt has a 72-byte limit for passwords
+            password = user_data["password"]
+            password_bytes = password.encode('utf-8') if isinstance(password, str) else password
+            password_len = len(password_bytes)
+            print(f"[PATCH DEBUG] Password bytes length: {password_len}, Password type: {type(password)}")
+            print(f"[PATCH DEBUG] About to hash password: '{password}'")
+            print(f"[PATCH DEBUG] Current user hashed_password type: {type(user.hashed_password)}, length: {len(user.hashed_password) if user.hashed_password else 'None'}")
+            
+            if password_len > 72:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Password cannot exceed 72 bytes when encoded as UTF-8. Current length: {password_len} bytes"
+                )
+            try:
+                user.hashed_password = pwd_context.hash(password)
+                print(f"[PATCH DEBUG] Password hashed successfully")
+            except ValueError as e:
+                print(f"[PATCH DEBUG] pwd_context.hash() raised ValueError: {e}")
+                raise
+        
+        if user_data.get("is_active") is not None:
+            user.is_active = user_data["is_active"]
+        
+        # Update organization for org admins (super admin only)
+        if user_data.get("organization_id") and current_user.role == UserRole.SUPER_ADMIN:
+            if user.role == UserRole.ORG_ADMIN or user_data.get("role") == "org_admin":
+                user.organization_id = user_data["organization_id"]
+        
+        db.commit()
+        db.refresh(user)
+        
+        import json
+        return {
+            "message": "User updated successfully",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "full_name": user.full_name,
+                "role": user.role.value,
+                "assigned_communities": json.loads(user.assigned_communities) if user.assigned_communities else [],
+                "organization_id": user.organization_id,
+                "is_active": user.is_active
+            }
         }
-    }
+    except HTTPException:
+        # Re-raise HTTPException without wrapping it
+        raise
+    except ValueError as e:
+        error_msg = str(e)
+        print(f"[PATCH ERROR] ValueError: {error_msg}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid data: {error_msg}"
+        )
+    except Exception as e:
+        error_msg = str(e)
+        print(f"[PATCH ERROR] Unexpected error: {error_msg}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {error_msg}"
+        )
 
 
 @app.delete("/api/organizations/{org_id}/users/{user_id}", tags=["Organizations"])
@@ -1471,4 +1531,7 @@ async def get_organization_stats(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8002"))
+    print(f"🚀 Starting backend on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)
