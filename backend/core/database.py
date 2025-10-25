@@ -143,6 +143,10 @@ class User(Base):
     ai_model_provider = Column(String, default="openai")  # openai or anthropic
     ai_temperature = Column(String, default="0.7")  # AI creativity level (0.0-1.0)
     
+    # 2FA (Two-Factor Authentication)
+    two_fa_enabled = Column(Boolean, default=False)
+    two_fa_secret = Column(String, nullable=True)  # TOTP secret key
+    
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)

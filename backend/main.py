@@ -12,7 +12,13 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any
 import os
 import json
+import io
+import base64
 from dotenv import load_dotenv
+
+# Import for 2FA
+import pyotp
+import qrcode
 
 # Import core modules
 from core.database import get_db, init_db, User, UserRole, Organization, SubscriptionPlan, ChatSession
@@ -178,6 +184,17 @@ class ProfileUpdateRequest(BaseModel):
     username: Optional[str] = None
     full_name: Optional[str] = None
 
+class Enable2FARequest(BaseModel):
+    verify_code: Optional[str] = None  # Optional for step 1, required for step 2
+
+class Enable2FAResponse(BaseModel):
+    qr_code: Optional[str] = None  # Base64 encoded QR code image
+    secret: Optional[str] = None  # TOTP secret for manual entry
+    enabled: bool
+
+class Verify2FARequest(BaseModel):
+    code: str  # 6-digit TOTP code
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
@@ -339,6 +356,116 @@ async def update_profile(
             "email": current_user.email,
             "role": current_user.role.value
         }
+    }
+
+@app.post("/api/auth/2fa/setup", response_model=Enable2FAResponse, tags=["Authentication"])
+async def setup_2fa(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate 2FA setup QR code"""
+    # Check if already enabled
+    if current_user.two_fa_enabled:
+        raise HTTPException(status_code=400, detail="2FA is already enabled")
+    
+    # Generate TOTP secret
+    secret = pyotp.random_base32()
+    
+    # Create provisioning URI for QR code
+    totp = pyotp.TOTP(secret)
+    provisioning_uri = totp.provisioning_uri(
+        name=current_user.email,
+        issuer_name="UnifiedWork"
+    )
+    
+    # Generate QR code image
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(provisioning_uri)
+    qr.make(fit=True)
+    
+    # Convert to image and encode as base64
+    img = qr.make_image(fill_color="black", back_color="white")
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+    qr_code_base64 = base64.b64encode(img_byte_arr.getvalue()).decode()
+    
+    # Store secret temporarily on the user object (will be saved when verified)
+    # In production, use Redis or session storage
+    current_user._temp_2fa_secret = secret
+    
+    return {
+        "qr_code": qr_code_base64,
+        "secret": secret,
+        "enabled": False
+    }
+
+@app.post("/api/auth/2fa/enable", tags=["Authentication"])
+async def enable_2fa(
+    enable_request: Enable2FARequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Enable 2FA with verification code"""
+    if not enable_request.verify_code:
+        raise HTTPException(status_code=400, detail="Verification code is required")
+    
+    # Check if user already has 2FA enabled
+    if current_user.two_fa_enabled:
+        raise HTTPException(status_code=400, detail="2FA is already enabled")
+    
+    # Check if user has a current secret (from setup endpoint)
+    if not hasattr(current_user, '_temp_2fa_secret') or not current_user._temp_2fa_secret:
+        raise HTTPException(status_code=400, detail="Please setup 2FA first")
+    
+    # Verify the code
+    totp = pyotp.TOTP(current_user._temp_2fa_secret)
+    if not totp.verify(enable_request.verify_code, valid_window=1):
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    
+    # Enable 2FA on the user
+    current_user.two_fa_enabled = True
+    current_user.two_fa_secret = current_user._temp_2fa_secret
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    
+    # Clear temporary secret
+    if hasattr(current_user, '_temp_2fa_secret'):
+        delattr(current_user, '_temp_2fa_secret')
+    
+    return {
+        "message": "2FA enabled successfully",
+        "enabled": True
+    }
+
+@app.post("/api/auth/2fa/disable", tags=["Authentication"])
+async def disable_2fa(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Disable 2FA"""
+    if not current_user.two_fa_enabled:
+        raise HTTPException(status_code=400, detail="2FA is not enabled")
+    
+    current_user.two_fa_enabled = False
+    current_user.two_fa_secret = None
+    db.add(current_user)
+    db.commit()
+    
+    return {
+        "message": "2FA disabled successfully",
+        "enabled": False
+    }
+
+@app.get("/api/auth/2fa/status", tags=["Authentication"])
+async def get_2fa_status(
+    current_user: User = Depends(get_current_user)
+):
+    """Get 2FA status for current user"""
+    return {
+        "enabled": current_user.two_fa_enabled,
+        "user_id": current_user.id
     }
 
 @app.post("/api/auth/register", response_model=TokenResponse, tags=["Authentication"])
