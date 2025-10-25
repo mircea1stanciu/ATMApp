@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Settings, User, Moon, Sun, Sparkles, ArrowLeft, Mail, MapPin, Briefcase, Edit2, Save, X } from 'lucide-react';
+import { Settings, User, Moon, Sun, Sparkles, ArrowLeft, Mail, MapPin, Briefcase, Edit2, Save, X, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import ModelSelector from '@/components/ModelSelector';
 
 interface UserData {
@@ -27,6 +27,20 @@ export default function SettingsPage() {
     email: '',
   });
   const [savedMessage, setSavedMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  
+  // Password change states
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false,
+  });
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -82,6 +96,74 @@ export default function SettingsPage() {
       });
     }
     setIsEditingProfile(false);
+  };
+
+  const handlePasswordChange = async () => {
+    setErrorMessage('');
+    
+    // Validation
+    if (!passwordData.currentPassword) {
+      setErrorMessage('Current password is required');
+      return;
+    }
+    if (!passwordData.newPassword) {
+      setErrorMessage('New password is required');
+      return;
+    }
+    if (passwordData.newPassword.length < 6) {
+      setErrorMessage('New password must be at least 6 characters');
+      return;
+    }
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setErrorMessage('New passwords do not match');
+      return;
+    }
+    if (passwordData.currentPassword === passwordData.newPassword) {
+      setErrorMessage('New password must be different from current password');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:8002/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          current_password: passwordData.currentPassword,
+          new_password: passwordData.newPassword,
+        }),
+      });
+
+      if (response.ok) {
+        setSavedMessage('Password changed successfully!');
+        setPasswordData({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+        setIsChangingPassword(false);
+        setTimeout(() => setSavedMessage(''), 3000);
+      } else {
+        const data = await response.json();
+        setErrorMessage(data.detail || 'Failed to change password');
+      }
+    } catch (error) {
+      setErrorMessage('Error changing password. Please try again.');
+      console.error('Password change error:', error);
+    }
+  };
+
+  const handleCancelPassword = () => {
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    });
+    setIsChangingPassword(false);
+    setErrorMessage('');
   };
 
   if (loading || !user) {
@@ -352,6 +434,137 @@ export default function SettingsPage() {
                                 )}
                               </div>
                             </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Password Change Section */}
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <Lock size={20} className="text-blue-600 dark:text-blue-400" />
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          Change Password
+                        </h3>
+                      </div>
+                      {!isChangingPassword && (
+                        <button
+                          onClick={() => setIsChangingPassword(true)}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                        >
+                          <Edit2 size={16} />
+                          Change Password
+                        </button>
+                      )}
+                    </div>
+
+                    {errorMessage && (
+                      <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg flex items-start gap-2">
+                        <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+                        <span>{errorMessage}</span>
+                      </div>
+                    )}
+
+                    {isChangingPassword ? (
+                      <div className="space-y-4">
+                        {/* Current Password */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Current Password
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showPasswords.current ? 'text' : 'password'}
+                              value={passwordData.currentPassword}
+                              onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                              className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="Enter current password"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            >
+                              {showPasswords.current ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* New Password */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            New Password
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showPasswords.new ? 'text' : 'password'}
+                              value={passwordData.newPassword}
+                              onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                              className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="Enter new password (minimum 6 characters)"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            >
+                              {showPasswords.new ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Confirm Password */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Confirm New Password
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showPasswords.confirm ? 'text' : 'password'}
+                              value={passwordData.confirmPassword}
+                              onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                              className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="Confirm new password"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            >
+                              {showPasswords.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                          <button
+                            onClick={handlePasswordChange}
+                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                          >
+                            <Save size={16} />
+                            Update Password
+                          </button>
+                          <button
+                            onClick={handleCancelPassword}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg transition-colors"
+                          >
+                            <X size={16} />
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle size={20} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-blue-900 dark:text-blue-200 font-medium">Secure your account</p>
+                            <p className="text-blue-800 dark:text-blue-300 text-sm mt-1">
+                              Click "Change Password" to update your password and keep your account secure.
+                            </p>
                           </div>
                         </div>
                       </div>

@@ -267,6 +267,36 @@ async def get_current_user_info(current_user: User = Depends(get_current_user), 
         "organization": org_info
     }
 
+@app.post("/api/auth/change-password", tags=["Authentication"])
+async def change_password(
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change user password"""
+    current_password = data.get("current_password")
+    new_password = data.get("new_password")
+    
+    if not current_password or not new_password:
+        raise HTTPException(status_code=400, detail="Current password and new password are required")
+    
+    # Verify current password
+    if not pwd_context.verify(current_password, current_user.password_hash):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    # Hash new password
+    new_password_hash = pwd_context.hash(new_password)
+    
+    # Update password in database
+    current_user.password_hash = new_password_hash
+    db.add(current_user)
+    db.commit()
+    
+    return {
+        "message": "Password changed successfully",
+        "status": "success"
+    }
+
 @app.post("/api/auth/register", response_model=TokenResponse, tags=["Authentication"])
 async def register(register_data: RegisterRequest, db: Session = Depends(get_db)):
     """Register new user with organization support"""
