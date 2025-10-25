@@ -165,8 +165,6 @@ export default function UserDashboard() {
                     <a
                       key={community.id}
                       href={`/community/${community.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       className="group bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-5 lg:p-6 shadow-md hover:shadow-xl transition-all duration-200 border-2 border-transparent hover:border-blue-500 hover:scale-[1.02]"
                     >
                       <div className="flex items-center justify-between mb-2 sm:mb-3 md:mb-4">
@@ -183,12 +181,6 @@ export default function UserDashboard() {
                       <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
                         {community.description}
                       </p>
-                      <div className="mt-2 flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400">
-                        <span>Open in new tab</span>
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                      </div>
                     </a>
                   ))}
                 </div>
