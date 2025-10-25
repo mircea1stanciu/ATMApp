@@ -170,6 +170,10 @@ class RegisterRequest(BaseModel):
     full_name: Optional[str] = None
     organization_slug: Optional[str] = None
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
@@ -269,13 +273,13 @@ async def get_current_user_info(current_user: User = Depends(get_current_user), 
 
 @app.post("/api/auth/change-password", tags=["Authentication"])
 async def change_password(
-    data: dict,
+    change_pwd_request: ChangePasswordRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Change user password"""
-    current_password = data.get("current_password")
-    new_password = data.get("new_password")
+    current_password = change_pwd_request.current_password
+    new_password = change_pwd_request.new_password
     
     if not current_password or not new_password:
         raise HTTPException(status_code=400, detail="Current password and new password are required")
