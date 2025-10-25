@@ -136,53 +136,55 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* Communities Grid */}
-        <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
-          <div className="flex items-center justify-between mb-3 sm:mb-4 md:mb-6">
-            <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white">
-              Your Communities
-            </h2>
-            {user.role === 'community_lead' && (
-              <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-semibold rounded-full border border-indigo-300 dark:border-indigo-700">
-                🎖️ Community Lead
-              </span>
-            )}
-          </div>
-          
-          {/* Community Leads and regular Users have access to all communities */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-                {communities.map((community) => (
-                  <a
-                    key={community.id}
-                    href={`/community/${community.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-5 lg:p-6 shadow-md hover:shadow-xl transition-all duration-200 border-2 border-transparent hover:border-blue-500 hover:scale-[1.02]"
-                  >
-                    <div className="flex items-center justify-between mb-2 sm:mb-3 md:mb-4">
-                      <div className={`${community.color} w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 rounded-lg sm:rounded-xl flex items-center justify-center text-base sm:text-lg md:text-xl group-hover:scale-110 transition-transform duration-200`}>
-                        {community.icon}
+        {/* Communities Grid - Only show if user is admin or has assigned communities */}
+        {(user.role === 'org_admin' || user.role === 'super_admin' || (user.assigned_communities && user.assigned_communities.length > 0)) && (
+          <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
+            <div className="flex items-center justify-between mb-3 sm:mb-4 md:mb-6">
+              <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white">
+                Your Communities
+              </h2>
+              {user.role === 'community_lead' && (
+                <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-semibold rounded-full border border-indigo-300 dark:border-indigo-700">
+                  🎖️ Community Lead
+                </span>
+              )}
+            </div>
+            
+            {/* Community Leads and regular Users have access to all communities */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+                  {communities.map((community) => (
+                    <a
+                      key={community.id}
+                      href={`/community/${community.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-5 lg:p-6 shadow-md hover:shadow-xl transition-all duration-200 border-2 border-transparent hover:border-blue-500 hover:scale-[1.02]"
+                    >
+                      <div className="flex items-center justify-between mb-2 sm:mb-3 md:mb-4">
+                        <div className={`${community.color} w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 rounded-lg sm:rounded-xl flex items-center justify-center text-base sm:text-lg md:text-xl group-hover:scale-110 transition-transform duration-200`}>
+                          {community.icon}
+                        </div>
+                        <span className="text-[10px] sm:text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400">
+                          {community.agent}
+                        </span>
                       </div>
-                      <span className="text-[10px] sm:text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400">
-                        {community.agent}
-                      </span>
-                    </div>
-                    <h3 className="text-xs sm:text-sm md:text-base font-bold text-gray-900 dark:text-white mb-1 sm:mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {community.name}
-                    </h3>
-                    <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                      {community.description}
-                    </p>
-                    <div className="mt-2 flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400">
-                      <span>Open in new tab</span>
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                    </div>
-                  </a>
-                ))}
-              </div>
-        </div>
+                      <h3 className="text-xs sm:text-sm md:text-base font-bold text-gray-900 dark:text-white mb-1 sm:mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {community.name}
+                      </h3>
+                      <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                        {community.description}
+                      </p>
+                      <div className="mt-2 flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400">
+                        <span>Open in new tab</span>
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+          </div>
+        )}
 
         {/* Recent Activity Placeholder */}
         <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 lg:p-8 shadow-md">
