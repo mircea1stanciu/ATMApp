@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Sun, Moon } from 'lucide-react';
 
 const API_HOST = process.env.NEXT_PUBLIC_API_HOST || 'localhost';
 const API_PORT = process.env.NEXT_PUBLIC_API_PORT || '8002';
@@ -822,7 +823,7 @@ export default function AdminDashboard() {
                 className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
                 title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               >
-                {isDark ? '☀️' : '🌙'}
+                {isDark ? <Sun size={18} /> : <Moon size={18} />}
               </button>
               <span className="hidden sm:inline text-xs sm:text-sm text-gray-900 dark:text-white font-medium">
                 {currentUser?.full_name || currentUser?.username}
