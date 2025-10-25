@@ -334,6 +334,7 @@ export default function CommunityPage() {
   const router = useRouter()
   const communityId = params.id as string
   const [hasAccess, setHasAccess] = useState<boolean | null>(null)
+  const [has2FA, setHas2FA] = useState<boolean | null>(null)
   const [user, setUser] = useState<any>(null)
   const [activeView, setActiveView] = useState<'dashboard' | 'projects'>('dashboard')
   const { isOpen: isChatOpen, openChat, closeChat, setActiveCommunityId } = useChat()
@@ -357,7 +358,7 @@ export default function CommunityPage() {
   }, [])
   
   useEffect(() => {
-    // Check if user has access to this community
+    // Check if user has access to this community and has 2FA enabled
     const userStr = localStorage.getItem('user');
     if (!userStr) {
       router.push('/login');
@@ -367,6 +368,15 @@ export default function CommunityPage() {
     try {
       const userData = JSON.parse(userStr);
       setUser(userData);
+      
+      // Check if user has 2FA enabled - if not, deny access
+      const twoFAEnabled = userData.two_fa_enabled || false;
+      setHas2FA(twoFAEnabled);
+      
+      if (!twoFAEnabled) {
+        setHasAccess(false);
+        return;
+      }
       
       // Super admins and org admins have access to all communities
       if (userData.role === 'super_admin' || userData.role === 'org_admin') {
@@ -428,6 +438,9 @@ export default function CommunityPage() {
 
   // Show access denied message
   if (!hasAccess) {
+    // Check if it's a 2FA issue
+    const is2FAIssue = has2FA === false;
+    
     return (
       <div className="h-screen flex flex-col">
         <Header />
@@ -435,23 +448,39 @@ export default function CommunityPage() {
           <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 sm:p-8">
             <div className="text-center">
               <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
-                <span className="text-3xl">🔒</span>
+                <span className="text-3xl">{is2FAIssue ? '🔐' : '🔒'}</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                Access Denied
+                {is2FAIssue ? 'Two-Factor Authentication Required' : 'Access Denied'}
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mb-4">
-                You don't have access to the <strong>{community.name}</strong> community.
+                {is2FAIssue 
+                  ? 'You must enable two-factor authentication to access community pages.'
+                  : `You don't have access to the ${community?.name} community.`
+                }
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
-                Please contact your organization administrator to request access to this community.
+                {is2FAIssue
+                  ? 'Go to Settings → Profile to enable 2FA using an authenticator app.'
+                  : 'Please contact your organization administrator to request access to this community.'
+                }
               </p>
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-              >
-                Back to Dashboard
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  Back to Dashboard
+                </button>
+                {is2FAIssue && (
+                  <button
+                    onClick={() => router.push('/settings')}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Go to Settings
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
