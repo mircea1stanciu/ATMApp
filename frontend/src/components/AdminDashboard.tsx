@@ -600,7 +600,7 @@ export default function AdminDashboard() {
       }
 
       // Build update data based on user role
-      // Super admins can update all fields including role
+      // Super admins can update all fields including role (optional)
       // Org admins can only update certain fields, but NOT change to org_admin role
       const updateData: any = {
         full_name: editUserForm.full_name,
@@ -611,8 +611,8 @@ export default function AdminDashboard() {
         ...(editUserForm.password && { password: editUserForm.password })
       };
 
-      // Only super admins can change role
-      if (currentUser?.role === 'super_admin') {
+      // Only super admins can change role (and it's optional)
+      if (currentUser?.role === 'super_admin' && editUserForm.role) {
         updateData.role = editUserForm.role;
         // Only super admins can set organization_id
         if (editUserForm.role === 'org_admin' && editUserForm.organization_id) {
@@ -2164,14 +2164,14 @@ export default function AdminDashboard() {
               {currentUser?.role === 'super_admin' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Role *
+                    Role
                   </label>
                   <select
-                    required
                     value={editUserForm.role}
                     onChange={(e) => setEditUserForm(prev => ({ ...prev, role: e.target.value, assigned_communities: [] }))}
                     className="box-border w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
+                    <option value="">No change</option>
                     <option value="user">User</option>
                     <option value="community_lead">Community Lead</option>
                     <option value="org_admin">Organization Admin</option>
