@@ -6,7 +6,7 @@ import { notFound } from 'next/navigation'
 import Header from '../../../components/Header'
 import CommunityDashboard from '../../../components/CommunityDashboard'
 import ProjectsPage from '../../../components/projects/ProjectsPage'
-import PersistentChatSidebar from '../../../components/PersistentChatSidebar'
+import ResizableChatPanel from '../../../components/ResizableChatPanel'
 import { useChat } from '../../../contexts/ChatContext'
 
 const communityData = {
@@ -657,8 +657,8 @@ export default function CommunityPage() {
 
         {/* Content Area */}
         <div className="flex-1 flex overflow-auto relative">
-          {/* Main Content Area */}
-          <div className="flex-1">
+          {/* Main Content Area - Resizable */}
+          <div className="flex-1 min-w-0 overflow-auto">
             {activeView === 'dashboard' && (
               <CommunityDashboard
                 communityId={communityId}
@@ -675,11 +675,16 @@ export default function CommunityPage() {
               />
             )}
           </div>
+
+          {/* Resizable Chat Panel */}
+          <ResizableChatPanel 
+            defaultWidth={420}
+            minWidth={300}
+            maxWidth={800}
+          />
         </div>
 
-        {/* Chat is now handled by the global PersistentChatSidebar component */}
-
-        {/* Floating Chat Button */}
+        {/* Floating Chat Button - Hidden when panel is visible */}
         <button
           onClick={() => {
             openChat(communityId);
@@ -692,9 +697,6 @@ export default function CommunityPage() {
           </svg>
           <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
         </button>
-
-        {/* Chat Sidebar - Only visible in community pages */}
-        <PersistentChatSidebar />
       </div>
     </div>
   )
