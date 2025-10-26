@@ -101,6 +101,19 @@ export default function AdminDashboard() {
   const [currentUserTwoFAEnabled, setCurrentUserTwoFAEnabled] = useState(false);
   const [twoFAError, setTwoFAError] = useState('');
   const [isVerifying2FA, setIsVerifying2FA] = useState(false);
+
+  // To Do List for API Documentation
+  interface TodoItem {
+    id: string;
+    text: string;
+    completed: boolean;
+    priority: 'low' | 'medium' | 'high';
+    createdAt: Date;
+  }
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [newTodo, setNewTodo] = useState('');
+  const [todoPriority, setTodoPriority] = useState<'low' | 'medium' | 'high'>('medium');
+
   const router = useRouter();
 
   useEffect(() => {
@@ -117,6 +130,22 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
+    // Load todos from localStorage
+    const savedTodos = localStorage.getItem('apiDocsTodos');
+    if (savedTodos) {
+      try {
+        const parsedTodos = JSON.parse(savedTodos);
+        setTodos(parsedTodos.map((todo: any) => ({
+          ...todo,
+          createdAt: new Date(todo.createdAt)
+        })));
+      } catch (e) {
+        console.error('Failed to load todos:', e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (activeSection === 'overview') loadOverview();
     if (activeSection === 'organizations') loadOrganizations();
     if (activeSection === 'users') loadUsers();
@@ -128,6 +157,11 @@ export default function AdminDashboard() {
       loadOverview();
     }
   }, [currentUser]);
+
+  // Save todos to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('apiDocsTodos', JSON.stringify(todos));
+  }, [todos]);
 
   const checkAuthentication = async () => {
     const token = localStorage.getItem('token');
@@ -225,6 +259,38 @@ export default function AdminDashboard() {
       }
       throw error;
     }
+  };
+
+  // To Do List Functions
+  const addTodo = () => {
+    if (newTodo.trim()) {
+      const todo: TodoItem = {
+        id: Date.now().toString(),
+        text: newTodo,
+        completed: false,
+        priority: todoPriority,
+        createdAt: new Date()
+      };
+      setTodos([...todos, todo]);
+      setNewTodo('');
+      setTodoPriority('medium');
+    }
+  };
+
+  const toggleTodoComplete = (id: string) => {
+    setTodos(todos.map(todo =>
+      todo.id === id ? { ...todo, completed: !todo.completed } : todo
+    ));
+  };
+
+  const deleteTodo = (id: string) => {
+    setTodos(todos.filter(todo => todo.id !== id));
+  };
+
+  const updateTodoPriority = (id: string, priority: 'low' | 'medium' | 'high') => {
+    setTodos(todos.map(todo =>
+      todo.id === id ? { ...todo, priority } : todo
+    ));
   };
 
   const loadOverview = async () => {
@@ -1596,6 +1662,135 @@ export default function AdminDashboard() {
                     </div>
                   </a>
                 </div>
+              </div>
+
+              {/* To Do List Section */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">✅ API Documentation To Do List</h3>
+                  <span className="text-xs sm:text-sm font-medium px-2 sm:px-3 py-1 sm:py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full">
+                    {todos.filter(t => !t.completed).length}/{todos.length}
+                  </span>
+                </div>
+
+                {/* Add New Todo */}
+                <div className="mb-4 sm:mb-6 space-y-2 sm:space-y-3">
+                  <div className="flex gap-2 sm:gap-3">
+                    <input
+                      type="text"
+                      value={newTodo}
+                      onChange={(e) => setNewTodo(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addTodo()}
+                      placeholder="Add a new task..."
+                      className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <select
+                      value={todoPriority}
+                      onChange={(e) => setTodoPriority(e.target.value as 'low' | 'medium' | 'high')}
+                      className="px-2 sm:px-3 py-2 sm:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                    <button
+                      onClick={addTodo}
+                      className="px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Todo List */}
+                <div className="space-y-2 sm:space-y-3 max-h-96 sm:max-h-[500px] overflow-y-auto">
+                  {todos.length === 0 ? (
+                    <div className="text-center py-8 sm:py-12">
+                      <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">No tasks yet. Add one to get started! 🚀</p>
+                    </div>
+                  ) : (
+                    todos.map((todo) => (
+                      <div
+                        key={todo.id}
+                        className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        {/* Checkbox */}
+                        <input
+                          type="checkbox"
+                          checked={todo.completed}
+                          onChange={() => toggleTodoComplete(todo.id)}
+                          className="w-4 h-4 sm:w-5 sm:h-5 rounded border-gray-300 text-blue-600 cursor-pointer accent-blue-600"
+                        />
+
+                        {/* Priority Indicator */}
+                        <div className={`w-1.5 sm:w-2 h-6 sm:h-8 rounded-full ${
+                          todo.priority === 'high' ? 'bg-red-500' :
+                          todo.priority === 'medium' ? 'bg-yellow-500' :
+                          'bg-green-500'
+                        }`} />
+
+                        {/* Todo Text */}
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm sm:text-base ${
+                            todo.completed
+                              ? 'line-through text-gray-400 dark:text-gray-500'
+                              : 'text-gray-900 dark:text-white'
+                          }`}>
+                            {todo.text}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(todo.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+
+                        {/* Priority Selector */}
+                        <select
+                          value={todo.priority}
+                          onChange={(e) => updateTodoPriority(todo.id, e.target.value as 'low' | 'medium' | 'high')}
+                          className="px-2 sm:px-3 py-1 sm:py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Med</option>
+                          <option value="high">High</option>
+                        </select>
+
+                        {/* Delete Button */}
+                        <button
+                          onClick={() => deleteTodo(todo.id)}
+                          className="px-2 sm:px-3 py-1 sm:py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Summary */}
+                {todos.length > 0 && (
+                  <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                      <div className="text-center">
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total</p>
+                        <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{todos.length}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Remaining</p>
+                        <p className="text-lg sm:text-xl font-bold text-blue-600">{todos.filter(t => !t.completed).length}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Completed</p>
+                        <p className="text-lg sm:text-xl font-bold text-green-600">{todos.filter(t => t.completed).length}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Completion</p>
+                        <p className="text-lg sm:text-xl font-bold text-purple-600">
+                          {todos.length > 0 ? Math.round((todos.filter(t => t.completed).length / todos.length) * 100) : 0}%
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
