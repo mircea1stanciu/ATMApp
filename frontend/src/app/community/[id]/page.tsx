@@ -676,27 +676,31 @@ export default function CommunityPage() {
             )}
           </div>
 
-          {/* Resizable Chat Panel */}
-          <ResizableChatPanel 
-            defaultWidth={420}
-            minWidth={300}
-            maxWidth={800}
-          />
+          {/* Resizable Chat Panel - Only visible when chat is open */}
+          {isChatOpen && (
+            <ResizableChatPanel 
+              defaultWidth={420}
+              minWidth={300}
+              maxWidth={800}
+            />
+          )}
         </div>
 
-        {/* Floating Chat Button - Hidden when panel is visible */}
-        <button
-          onClick={() => {
-            openChat(communityId);
-          }}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-40"
-          title="Open AI Assistant"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-          </svg>
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
-        </button>
+        {/* Floating Chat Button - Only visible when chat is closed */}
+        {!isChatOpen && (
+          <button
+            onClick={() => {
+              openChat(communityId);
+            }}
+            className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-40"
+            title="Open AI Assistant"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+            <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+          </button>
+        )}
       </div>
     </div>
   )

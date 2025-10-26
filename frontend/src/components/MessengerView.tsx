@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useChat } from '@/contexts/ChatContext';
 
 // TypeScript interfaces
 interface User {
@@ -54,6 +55,7 @@ const getCurrentUser = () => {
 };
 
 export default function MessengerView() {
+  const { closeChat } = useChat();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -90,6 +92,11 @@ export default function MessengerView() {
     'Authorization': `Bearer ${getAuthToken()}`,
     'Content-Type': 'application/json'
   });
+
+  // Handle close chat
+  const handleCloseChat = () => {
+    closeChat();
+  };
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -857,6 +864,16 @@ export default function MessengerView() {
                     }
                   </div>
                 </div>
+                {/* Close button */}
+                <button
+                  onClick={handleCloseChat}
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  title="Close chat"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             </div>
 

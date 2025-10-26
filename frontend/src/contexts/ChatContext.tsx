@@ -28,7 +28,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setIsClient(true);
   }, []);
 
-  // Persist chat state to localStorage
+  // Load chat preferences from localStorage (but NOT isOpen - chat should start closed)
   useEffect(() => {
     if (!isClient) return;
     
@@ -36,11 +36,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (savedState) {
       try {
         const { 
-          isOpen: savedIsOpen, 
           activeCommunityId: savedCommunityId,
           activeTab: savedActiveTab
         } = JSON.parse(savedState);
-        setIsOpen(savedIsOpen || false);
         setActiveCommunityId(savedCommunityId || null);
         setActiveTab(savedActiveTab || 'ai');
       } catch (e) {
@@ -49,18 +47,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [isClient]);
 
-
-
-  // Save chat state to localStorage whenever it changes
+  // Save chat preferences to localStorage (but NOT isOpen - chat always starts closed)
   useEffect(() => {
     if (!isClient) return;
     
     localStorage.setItem('chatState', JSON.stringify({
-      isOpen,
       activeCommunityId,
       activeTab
     }));
-  }, [isClient, isOpen, activeCommunityId, activeTab]);
+  }, [isClient, activeCommunityId, activeTab]);
 
   const openChat = (communityId?: string) => {
     setIsOpen(true);
