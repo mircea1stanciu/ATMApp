@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import PersistentChatSidebar from './PersistentChatSidebar'
+import MessengerView from './MessengerView'
 
 interface ResizableChatPanelProps {
   defaultWidth?: number
@@ -88,8 +88,8 @@ export default function ResizableChatPanel({
   return (
     <div
       ref={panelRef}
-      className="relative flex flex-col bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden group"
-      style={{ width: `${width}px` }}
+      className="relative flex flex-col bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full group"
+      style={{ width: `${width}px`, minWidth: `${minWidth}px` }}
     >
       {/* Left Resize Handle - Compress dashboard, expand panel */}
       <div
@@ -115,9 +115,9 @@ export default function ResizableChatPanel({
         </div>
       )}
 
-      {/* Chat Panel Content */}
-      <div className="flex-1 overflow-hidden">
-        <PersistentChatSidebar />
+      {/* Chat Panel Content - MessengerView */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <MessengerView />
       </div>
     </div>
   )
