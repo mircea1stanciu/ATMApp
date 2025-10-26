@@ -109,10 +109,12 @@ export default function AdminDashboard() {
     completed: boolean;
     priority: 'low' | 'medium' | 'high';
     createdAt: Date;
+    deadline?: Date;
   }
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [newTodo, setNewTodo] = useState('');
   const [todoPriority, setTodoPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [todoDeadline, setTodoDeadline] = useState<string>('');
 
   const router = useRouter();
 
@@ -139,7 +141,8 @@ export default function AdminDashboard() {
           const parsedTodos = JSON.parse(savedTodos);
           setTodos(parsedTodos.map((todo: any) => ({
             ...todo,
-            createdAt: new Date(todo.createdAt)
+            createdAt: new Date(todo.createdAt),
+            deadline: todo.deadline ? new Date(todo.deadline) : undefined
           })));
         } catch (e) {
           console.error('Failed to load todos:', e);
@@ -275,11 +278,13 @@ export default function AdminDashboard() {
         text: newTodo,
         completed: false,
         priority: todoPriority,
-        createdAt: new Date()
+        createdAt: new Date(),
+        deadline: todoDeadline ? new Date(todoDeadline) : undefined
       };
       setTodos([...todos, todo]);
       setNewTodo('');
       setTodoPriority('medium');
+      setTodoDeadline('');
     }
   };
 
@@ -297,6 +302,34 @@ export default function AdminDashboard() {
     setTodos(todos.map(todo =>
       todo.id === id ? { ...todo, priority } : todo
     ));
+  };
+
+  const updateTodoDeadline = (id: string, deadline: string) => {
+    setTodos(todos.map(todo =>
+      todo.id === id ? { ...todo, deadline: deadline ? new Date(deadline) : undefined } : todo
+    ));
+  };
+
+  // Sort todos by deadline (earliest first) and then by priority (high > medium > low)
+  const getSortedTodos = (todoList: TodoItem[]) => {
+    const priorityValue = { high: 1, medium: 2, low: 3 };
+    return [...todoList].sort((a, b) => {
+      // Incomplete todos first
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1;
+      }
+
+      // Sort by deadline
+      const aDeadline = a.deadline ? a.deadline.getTime() : Infinity;
+      const bDeadline = b.deadline ? b.deadline.getTime() : Infinity;
+      
+      if (aDeadline !== bDeadline) {
+        return aDeadline - bDeadline;
+      }
+
+      // If same deadline, sort by priority
+      return priorityValue[a.priority] - priorityValue[b.priority];
+    });
   };
 
   const loadOverview = async () => {
@@ -1701,48 +1734,64 @@ export default function AdminDashboard() {
                 {/* Add New Todo */}
                 <div className="mb-6 sm:mb-8 space-y-2 sm:space-y-3">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Add New Task</label>
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                    <input
-                      type="text"
-                      value={newTodo}
-                      onChange={(e) => setNewTodo(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && addTodo()}
-                      placeholder="What needs to be documented?"
-                      className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <select
-                      value={todoPriority}
-                      onChange={(e) => setTodoPriority(e.target.value as 'low' | 'medium' | 'high')}
-                      className="px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="low">🟢 Low Priority</option>
-                      <option value="medium">🟡 Medium Priority</option>
-                      <option value="high">🔴 High Priority</option>
-                    </select>
-                    <button
-                      onClick={addTodo}
-                      className="px-4 sm:px-6 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-semibold whitespace-nowrap"
-                    >
-                      Add Task
-                    </button>
+                  <div className="flex flex-col gap-2 sm:gap-3">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                      <input
+                        type="text"
+                        value={newTodo}
+                        onChange={(e) => setNewTodo(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && addTodo()}
+                        placeholder="What needs to be documented?"
+                        className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <select
+                        value={todoPriority}
+                        onChange={(e) => setTodoPriority(e.target.value as 'low' | 'medium' | 'high')}
+                        className="px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="low">🟢 Low Priority</option>
+                        <option value="medium">🟡 Medium Priority</option>
+                        <option value="high">🔴 High Priority</option>
+                      </select>
+                      <input
+                        type="date"
+                        value={todoDeadline}
+                        onChange={(e) => setTodoDeadline(e.target.value)}
+                        className="px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        title="Set deadline (optional)"
+                      />
+                      <button
+                        onClick={addTodo}
+                        className="px-4 sm:px-6 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-semibold whitespace-nowrap"
+                      >
+                        Add Task
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 {/* Todo List */}
                 <div className="space-y-2 sm:space-y-3">
-                  {todos.length === 0 ? (
+                  {getSortedTodos(todos).length === 0 ? (
                     <div className="text-center py-12 sm:py-16">
                       <p className="text-4xl sm:text-5xl mb-3">🚀</p>
                       <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base font-medium">No tasks yet</p>
                       <p className="text-gray-400 dark:text-gray-500 text-xs sm:text-sm mt-2">Add your first task to get started!</p>
                     </div>
                   ) : (
-                    todos.map((todo) => (
+                    getSortedTodos(todos).map((todo) => {
+                      const isOverdue = todo.deadline && !todo.completed && new Date(todo.deadline) < new Date();
+                      const isUrgent = todo.deadline && !todo.completed && new Date(todo.deadline) <= new Date(Date.now() + 24 * 60 * 60 * 1000);
+                      return (
                       <div
                         key={todo.id}
                         className={`flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-lg transition-all border ${
                           todo.completed
                             ? 'bg-gray-50 dark:bg-gray-700/30 border-gray-200 dark:border-gray-700'
+                            : isOverdue
+                            ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
+                            : isUrgent
+                            ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700'
                             : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                         }`}
                       >
@@ -1770,9 +1819,20 @@ export default function AdminDashboard() {
                           }`}>
                             {todo.text}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            📅 {new Date(todo.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                          </p>
+                          <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                            <p>📅 Created: {new Date(todo.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
+                            {todo.deadline && (
+                              <p className={`${
+                                isOverdue ? 'text-red-600 dark:text-red-400 font-semibold' :
+                                isUrgent ? 'text-orange-600 dark:text-orange-400 font-semibold' :
+                                'text-gray-500 dark:text-gray-400'
+                              }`}>
+                                📌 Due: {new Date(todo.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                {isOverdue && ' (OVERDUE)'}
+                                {isUrgent && !isOverdue && ' (Due soon)'}
+                              </p>
+                            )}
+                          </div>
                         </div>
 
                         {/* Priority Badge */}
@@ -1785,7 +1845,14 @@ export default function AdminDashboard() {
                         </span>
 
                         {/* Actions */}
-                        <div className="flex gap-2 sm:gap-3 flex-shrink-0">
+                        <div className="flex gap-1 sm:gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
+                          <input
+                            type="date"
+                            value={todo.deadline ? new Date(todo.deadline).toISOString().split('T')[0] : ''}
+                            onChange={(e) => updateTodoDeadline(todo.id, e.target.value)}
+                            className="px-2 sm:px-3 py-1 sm:py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            title="Set or change deadline"
+                          />
                           <select
                             value={todo.priority}
                             onChange={(e) => updateTodoPriority(todo.id, e.target.value as 'low' | 'medium' | 'high')}
@@ -1805,7 +1872,8 @@ export default function AdminDashboard() {
                           </button>
                         </div>
                       </div>
-                    ))
+                    );
+                    })
                   )}
                 </div>
 
