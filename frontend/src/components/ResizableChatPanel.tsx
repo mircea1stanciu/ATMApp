@@ -88,7 +88,7 @@ export default function ResizableChatPanel({
   return (
     <div
       ref={panelRef}
-      className="relative flex flex-col bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full group"
+      className="relative flex flex-col bg-gray-800 border-l border-gray-700 h-full group shrink-0"
       style={{ width: `${width}px`, minWidth: `${minWidth}px` }}
     >
       {/* Left Resize Handle - Compress dashboard, expand panel */}

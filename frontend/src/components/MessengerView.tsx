@@ -829,9 +829,9 @@ export default function MessengerView() {
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="p-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-              <div className="flex items-center gap-2">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium ${
+            <div className="p-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium flex-shrink-0 ${
                   selectedConversation.is_group 
                     ? 'bg-gradient-to-br from-purple-500 to-pink-600' 
                     : 'bg-gray-500'
@@ -864,17 +864,17 @@ export default function MessengerView() {
                     }
                   </div>
                 </div>
-                {/* Close button */}
-                <button
-                  onClick={handleCloseChat}
-                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-                  title="Close chat"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
               </div>
+              {/* Close button */}
+              <button
+                onClick={handleCloseChat}
+                className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors flex-shrink-0 ml-2"
+                title="Close chat"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
 
             {/* Messages */}
