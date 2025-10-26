@@ -234,6 +234,9 @@ class Enable2FAResponse(BaseModel):
     secret: Optional[str] = None  # TOTP secret for manual entry
     enabled: bool
 
+class OrgActionWithTwoFARequest(BaseModel):
+    two_fa_code: Optional[str] = None  # 2FA code for sensitive organization operations
+
 class Verify2FARequest(BaseModel):
     code: str  # 6-digit TOTP code
 
@@ -1569,13 +1572,24 @@ async def update_subscription_plan(
 @app.delete("/api/organizations/{org_id}", tags=["Organizations"])
 async def delete_organization(
     org_id: int,
+    request_data: OrgActionWithTwoFARequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_super_admin_user)
 ):
-    """Delete organization (Super Admin only)"""
+    """Delete organization (Super Admin only) - requires 2FA if enabled"""
     org = db.query(Organization).filter(Organization.id == org_id).first()
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Check 2FA requirement for super admin
+    if current_user.two_fa_enabled:
+        if not request_data.two_fa_code:
+            raise HTTPException(status_code=403, detail="2FA code is required for sensitive operations")
+        
+        # Verify the TOTP code
+        totp = pyotp.TOTP(current_user.two_fa_secret)
+        if not totp.verify(request_data.two_fa_code, valid_window=1):
+            raise HTTPException(status_code=401, detail="Invalid 2FA code")
     
     # Delete all users in organization
     db.query(User).filter(User.organization_id == org_id).delete()
@@ -1880,16 +1894,27 @@ async def delete_organization_user(
 @app.patch("/api/organizations/{org_id}/block", tags=["Organizations"])
 async def block_organization(
     org_id: int,
+    request_data: OrgActionWithTwoFARequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_super_admin_user)
 ):
-    """Block an organization (Super Admin only)"""
+    """Block an organization (Super Admin only) - requires 2FA if enabled"""
     org = db.query(Organization).filter(Organization.id == org_id).first()
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
     
     if org.id == 1:
         raise HTTPException(status_code=403, detail="Cannot block default organization")
+    
+    # Check 2FA requirement for super admin
+    if current_user.two_fa_enabled:
+        if not request_data.two_fa_code:
+            raise HTTPException(status_code=403, detail="2FA code is required for sensitive operations")
+        
+        # Verify the TOTP code
+        totp = pyotp.TOTP(current_user.two_fa_secret)
+        if not totp.verify(request_data.two_fa_code, valid_window=1):
+            raise HTTPException(status_code=401, detail="Invalid 2FA code")
     
     org.is_active = False
     db.commit()

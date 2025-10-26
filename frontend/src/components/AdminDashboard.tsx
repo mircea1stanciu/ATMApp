@@ -93,11 +93,15 @@ export default function AdminDashboard() {
     subscription_plan: 'free'
   });
   const [selectedOrgFilter, setSelectedOrgFilter] = useState<string>('all');
+  
+  // 2FA verification for organization operations
+  const [show2FAVerification, setShow2FAVerification] = useState(false);
+  const [twoFACode, setTwoFACode] = useState('');
+  const [pendingOrgAction, setPendingOrgAction] = useState<{ action: 'block' | 'delete'; orgId: number; orgName: string } | null>(null);
+  const [currentUserTwoFAEnabled, setCurrentUserTwoFAEnabled] = useState(false);
+  const [twoFAError, setTwoFAError] = useState('');
+  const [isVerifying2FA, setIsVerifying2FA] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    checkAuthentication();
-  }, []);
 
   useEffect(() => {
     // Initialize dark mode from localStorage
@@ -132,13 +136,15 @@ export default function AdminDashboard() {
 
       const user = await response.json();
       setCurrentUser(user);
+      setCurrentUserTwoFAEnabled(user.two_fa_enabled || false);
       
       // Debug: Log user information for troubleshooting
       console.log('🔍 Current User Info:', {
         username: user.username,
         role: user.role,
         organization_id: user.organization_id,
-        organization_name: user.organization?.name
+        organization_name: user.organization?.name,
+        two_fa_enabled: user.two_fa_enabled
       });
 
       if (user.role !== 'super_admin' && user.role !== 'org_admin') {
@@ -358,20 +364,58 @@ export default function AdminDashboard() {
       return;
     }
 
-    try {
-      await apiCall(`/api/organizations/${orgId}`, {
-        method: 'DELETE'
-      });
+    // Show 2FA verification modal instead of directly deleting
+    setPendingOrgAction({ action: 'delete', orgId, orgName });
+    setShow2FAVerification(true);
+    setTwoFACode('');
+    setTwoFAError('');
+  };
 
-      alert('✅ Organization deleted successfully');
-      
+  const handle2FAVerificationForOrgAction = async () => {
+    if (!twoFACode || twoFACode.length !== 6 || !/^\d+$/.test(twoFACode)) {
+      setTwoFAError('2FA code must be 6 digits');
+      return;
+    }
+
+    if (!pendingOrgAction) {
+      setTwoFAError('No pending action');
+      return;
+    }
+
+    setIsVerifying2FA(true);
+    setTwoFAError('');
+
+    try {
+      const action = pendingOrgAction.action;
+      const orgId = pendingOrgAction.orgId;
+      const orgName = pendingOrgAction.orgName;
+
+      if (action === 'block') {
+        await apiCall(`/api/organizations/${orgId}/block`, { 
+          method: 'PATCH',
+          body: JSON.stringify({ two_fa_code: twoFACode })
+        });
+        alert(`✅ Organization "${orgName}" has been blocked.`);
+      } else if (action === 'delete') {
+        await apiCall(`/api/organizations/${orgId}`, {
+          method: 'DELETE',
+          body: JSON.stringify({ two_fa_code: twoFACode })
+        });
+        alert('✅ Organization deleted successfully');
+      }
+
       // Reload data
+      setShow2FAVerification(false);
+      setPendingOrgAction(null);
+      setTwoFACode('');
       await loadOrganizations();
       if (activeSection === 'overview') {
         await loadOverview();
       }
     } catch (error) {
-      alert('Failed to delete organization: ' + (error as Error).message);
+      setTwoFAError('Failed to verify 2FA code. ' + (error as Error).message);
+    } finally {
+      setIsVerifying2FA(false);
     }
   };
 
@@ -1041,19 +1085,23 @@ export default function AdminDashboard() {
                                   {currentUser?.role === 'super_admin' && org.id !== 1 && (
                                     org.is_active ? (
                                       <button 
-                                        onClick={async () => {
+                                        onClick={() => {
                                           if (!confirm(`⚠️ Block "${org.name}"?\n\nThis will prevent all users from logging in and new registrations.`)) {
                                             return;
                                           }
-                                          try {
-                                            await apiCall(`/api/organizations/${org.id}/block`, { method: 'PATCH' });
-                                            alert(`✅ Organization "${org.name}" has been blocked.`);
-                                            await loadOrganizations();
-                                          } catch (error) {
-                                            alert('Failed to block organization: ' + (error as Error).message);
-                                          }
+                                          // Show 2FA verification modal instead of directly blocking
+                                          setPendingOrgAction({ action: 'block', orgId: org.id, orgName: org.name });
+                                          setShow2FAVerification(true);
+                                          setTwoFACode('');
+                                          setTwoFAError('');
                                         }}
-                                        className="px-3 py-1 bg-orange-100 text-orange-700 rounded text-xs hover:bg-orange-200 transition-colors"
+                                        disabled={!currentUserTwoFAEnabled}
+                                        title={!currentUserTwoFAEnabled ? 'Enable 2FA to block organizations' : 'Block this organization'}
+                                        className={`px-3 py-1 rounded text-xs transition-colors ${
+                                          currentUserTwoFAEnabled 
+                                            ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' 
+                                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                        }`}
                                       >
                                         🚫 Block
                                       </button>
@@ -1077,7 +1125,13 @@ export default function AdminDashboard() {
                                   {currentUser?.role === 'super_admin' && org.id !== 1 && (
                                     <button 
                                       onClick={() => handleDeleteOrg(org.id, org.name)}
-                                      className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 transition-colors"
+                                      disabled={!currentUserTwoFAEnabled}
+                                      title={!currentUserTwoFAEnabled ? 'Enable 2FA to delete organizations' : 'Delete this organization'}
+                                      className={`px-3 py-1 rounded text-xs transition-colors ${
+                                        currentUserTwoFAEnabled 
+                                          ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                      }`}
                                     >
                                       🗑️ Delete
                                     </button>
@@ -2306,6 +2360,83 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* 2FA Verification Modal for Organization Actions */}
+      {show2FAVerification && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full m-4 p-6">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Verify Your Identity
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
+                {pendingOrgAction?.action === 'block'
+                  ? `Enter your 2FA code to block "${pendingOrgAction.orgName}"`
+                  : `Enter your 2FA code to delete "${pendingOrgAction?.orgName}"`}
+              </p>
+            </div>
+
+            {/* 2FA Code Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                6-Digit Authentication Code
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={twoFACode}
+                onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Enter the code from your authenticator app
+              </p>
+            </div>
+
+            {/* Error Message */}
+            {twoFAError && (
+              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg">
+                <p className="text-red-700 dark:text-red-300 text-sm">{twoFAError}</p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={handle2FAVerificationForOrgAction}
+                disabled={isVerifying2FA || twoFACode.length !== 6}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              >
+                {isVerifying2FA ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    {pendingOrgAction?.action === 'block' ? '🚫 Block' : '🗑️ Delete'}
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShow2FAVerification(false);
+                  setPendingOrgAction(null);
+                  setTwoFACode('');
+                  setTwoFAError('');
+                }}
+                disabled={isVerifying2FA}
+                className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-300 disabled:cursor-not-allowed text-gray-900 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
