@@ -118,6 +118,13 @@ export default function AdminDashboard() {
     if (activeSection === 'users') loadUsers();
   }, [activeSection]);
 
+  // Load initial data after user is authenticated
+  useEffect(() => {
+    if (currentUser && activeSection === 'overview') {
+      loadOverview();
+    }
+  }, [currentUser]);
+
   const checkAuthentication = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
