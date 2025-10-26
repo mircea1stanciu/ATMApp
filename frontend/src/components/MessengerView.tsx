@@ -71,6 +71,8 @@ export default function MessengerView() {
   const [groupName, setGroupName] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -281,6 +283,46 @@ export default function MessengerView() {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
+      generateFilePreview(file);
+    }
+  };
+
+  // Generate preview URL for images
+  const generateFilePreview = (file: File) => {
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFilePreviewUrl(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFilePreviewUrl(null);
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      setSelectedFile(file);
+      generateFilePreview(file);
     }
   };
 
@@ -326,6 +368,7 @@ export default function MessengerView() {
         setMessages(prev => [...prev, sentMessage]);
         setNewMessage('');
         setSelectedFile(null);
+        setFilePreviewUrl(null);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -947,15 +990,31 @@ export default function MessengerView() {
             </div>
 
             {/* Message Input */}
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors ${
+                isDraggingFile ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400' : ''
+              }`}>
               {/* File preview */}
               {selectedFile && (
                 <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{getFileIcon(selectedFile.type)}</span>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 flex-1">
+                      {/* Image thumbnail preview */}
+                      {filePreviewUrl && (
+                        <img 
+                          src={filePreviewUrl} 
+                          alt="preview" 
+                          className="w-12 h-12 object-cover rounded border border-gray-300 dark:border-gray-500"
+                        />
+                      )}
+                      {!filePreviewUrl && (
+                        <span className="text-2xl">{getFileIcon(selectedFile.type)}</span>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
                           {selectedFile.name}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -966,6 +1025,7 @@ export default function MessengerView() {
                     <button
                       onClick={() => {
                         setSelectedFile(null);
+                        setFilePreviewUrl(null);
                         if (fileInputRef.current) {
                           fileInputRef.current.value = '';
                         }
