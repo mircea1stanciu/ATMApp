@@ -130,20 +130,23 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    // Load todos from localStorage
-    const savedTodos = localStorage.getItem('apiDocsTodos');
-    if (savedTodos) {
-      try {
-        const parsedTodos = JSON.parse(savedTodos);
-        setTodos(parsedTodos.map((todo: any) => ({
-          ...todo,
-          createdAt: new Date(todo.createdAt)
-        })));
-      } catch (e) {
-        console.error('Failed to load todos:', e);
+    // Load todos from localStorage - use currentUser.id to make it private per user
+    if (currentUser?.id) {
+      const todoKey = `apiDocsTodos_${currentUser.id}`;
+      const savedTodos = localStorage.getItem(todoKey);
+      if (savedTodos) {
+        try {
+          const parsedTodos = JSON.parse(savedTodos);
+          setTodos(parsedTodos.map((todo: any) => ({
+            ...todo,
+            createdAt: new Date(todo.createdAt)
+          })));
+        } catch (e) {
+          console.error('Failed to load todos:', e);
+        }
       }
     }
-  }, []);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (activeSection === 'overview') loadOverview();
@@ -158,10 +161,13 @@ export default function AdminDashboard() {
     }
   }, [currentUser]);
 
-  // Save todos to localStorage whenever they change
+  // Save todos to localStorage whenever they change - use currentUser.id to make it private per user
   useEffect(() => {
-    localStorage.setItem('apiDocsTodos', JSON.stringify(todos));
-  }, [todos]);
+    if (currentUser?.id) {
+      const todoKey = `apiDocsTodos_${currentUser.id}`;
+      localStorage.setItem(todoKey, JSON.stringify(todos));
+    }
+  }, [todos, currentUser?.id]);
 
   const checkAuthentication = async () => {
     const token = localStorage.getItem('token');
@@ -866,7 +872,7 @@ export default function AdminDashboard() {
             { id: 'organizations', icon: '🏢', label: 'Organizations', roles: ['super_admin'] },
             { id: 'users', icon: '👥', label: 'Users', roles: ['super_admin', 'org_admin'] },
             { id: 'api-docs', icon: '📚', label: 'API Documentation', roles: ['super_admin'] },
-            { id: 'api-docs-todo', icon: '✅', label: 'API To Do List', roles: ['super_admin'] }
+            { id: 'api-docs-todo', icon: '✅', label: 'To Do List', roles: ['super_admin', 'org_admin'] }
           ].filter(item => item.roles.includes(currentUser?.role || '')).map((item) => (
             <button
               key={item.id}
@@ -919,7 +925,7 @@ export default function AdminDashboard() {
                 {activeSection === 'organizations' && 'Organizations Management'}
                 {activeSection === 'users' && (currentUser?.role === 'org_admin' ? 'Organization Users' : 'Users Management')}
                 {activeSection === 'api-docs' && 'API Documentation'}
-                {activeSection === 'api-docs-todo' && 'API Documentation To Do List'}
+                {activeSection === 'api-docs-todo' && (currentUser?.role === 'org_admin' ? 'My To Do List' : 'API Documentation To Do List')}
               </h1>
               <div className="flex items-center gap-2 mt-0.5">
                 <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400">
@@ -1671,10 +1677,12 @@ export default function AdminDashboard() {
           {/* API Documentation To Do List Page */}
           {activeSection === 'api-docs-todo' && (
             <div className="space-y-4 sm:space-y-6">
-              <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg p-4 sm:p-5 md:p-6 text-white mb-4 sm:mb-6">
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2">✅ API Documentation To Do List</h2>
-                <p className="text-xs sm:text-sm text-purple-100">
-                  Organize and track your API documentation tasks
+              <div className={`bg-gradient-to-r ${currentUser?.role === 'org_admin' ? 'from-orange-600 to-red-600' : 'from-purple-600 to-blue-600'} rounded-lg p-4 sm:p-5 md:p-6 text-white mb-4 sm:mb-6`}>
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2">
+                  {currentUser?.role === 'org_admin' ? '✅ My Organization To Do List' : '✅ API Documentation To Do List'}
+                </h2>
+                <p className="text-xs sm:text-sm text-opacity-90">
+                  {currentUser?.role === 'org_admin' ? 'Organize and track your organization tasks' : 'Organize and track your API documentation tasks'}
                 </p>
               </div>
 
