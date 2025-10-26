@@ -612,35 +612,35 @@ export default function CommunityPage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Header */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 md:px-6 py-2 sm:py-3 sticky top-0 z-20">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${community.color} text-white`}>
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-2 sm:px-4 md:px-6 py-2 sm:py-3 sticky top-0 z-20">
+          <div className="flex justify-between items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className={`w-8 sm:w-10 h-8 sm:h-10 rounded-full flex items-center justify-center text-lg sm:text-xl flex-shrink-0 ${community.color} text-white`}>
                 {community.icon}
               </div>
-              <div>
-                <h1 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-sm sm:text-base md:text-lg font-bold text-gray-900 dark:text-white truncate">
                   {community.name}
                 </h1>
-                <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-[10px] sm:text-[11px] md:text-xs text-gray-600 dark:text-gray-400 truncate">
                   {activeView === 'projects' ? 'Projects' : 'Dashboard'}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1 sm:gap-2 md:gap-3 flex-wrap justify-end">
               {/* AI Assistant Button */}
               <button
                 onClick={() => openChat(communityId)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-xs sm:text-sm font-medium"
                 title="Open AI Assistant"
               >
                 <span>💬</span>
-                <span className="hidden sm:inline">AI Assistant</span>
+                <span className="hidden sm:inline">AI</span>
               </button>
-              <span className="hidden sm:inline text-xs sm:text-sm text-gray-900 dark:text-white font-medium">
+              <span className="hidden md:inline text-xs sm:text-sm text-gray-900 dark:text-white font-medium truncate max-w-[150px]">
                 {user?.full_name || user?.username}
               </span>
-              <span className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-medium ${
+              <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[9px] md:text-[10px] font-medium whitespace-nowrap ${
                 user?.role === 'super_admin' 
                   ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                   : user?.role === 'org_admin'
