@@ -921,20 +921,20 @@ export default function AdminDashboard() {
             </button>
           ))}
           
-          <div className="mt-8 px-6">
+          <div className="mt-8 px-6 space-y-2">
+            <button
+              onClick={() => router.push('/')}
+              className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
+            >
+              <span className="text-lg">🏠</span>
+              <span>Home</span>
+            </button>
             <button
               onClick={() => router.push('/settings')}
               className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
             >
               <span className="text-lg">⚙️</span>
               <span>Settings</span>
-            </button>
-            <button
-              onClick={() => router.push('/')}
-              className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
-            >
-              <span className="text-lg">💬</span>
-              <span>Chat</span>
             </button>
             <button
               onClick={logout}
