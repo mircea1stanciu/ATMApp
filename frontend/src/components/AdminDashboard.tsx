@@ -865,7 +865,8 @@ export default function AdminDashboard() {
             { id: 'overview', icon: '📊', label: 'Overview', roles: ['super_admin', 'org_admin'] },
             { id: 'organizations', icon: '🏢', label: 'Organizations', roles: ['super_admin'] },
             { id: 'users', icon: '👥', label: 'Users', roles: ['super_admin', 'org_admin'] },
-            { id: 'api-docs', icon: '📚', label: 'API Documentation', roles: ['super_admin'] }
+            { id: 'api-docs', icon: '📚', label: 'API Documentation', roles: ['super_admin'] },
+            { id: 'api-docs-todo', icon: '✅', label: 'API To Do List', roles: ['super_admin'] }
           ].filter(item => item.roles.includes(currentUser?.role || '')).map((item) => (
             <button
               key={item.id}
@@ -918,6 +919,7 @@ export default function AdminDashboard() {
                 {activeSection === 'organizations' && 'Organizations Management'}
                 {activeSection === 'users' && (currentUser?.role === 'org_admin' ? 'Organization Users' : 'Users Management')}
                 {activeSection === 'api-docs' && 'API Documentation'}
+                {activeSection === 'api-docs-todo' && 'API Documentation To Do List'}
               </h1>
               <div className="flex items-center gap-2 mt-0.5">
                 <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 dark:text-gray-400">
@@ -1663,67 +1665,89 @@ export default function AdminDashboard() {
                   </a>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* To Do List Section */}
+          {/* API Documentation To Do List Page */}
+          {activeSection === 'api-docs-todo' && (
+            <div className="space-y-4 sm:space-y-6">
+              <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg p-4 sm:p-5 md:p-6 text-white mb-4 sm:mb-6">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2">✅ API Documentation To Do List</h2>
+                <p className="text-xs sm:text-sm text-purple-100">
+                  Organize and track your API documentation tasks
+                </p>
+              </div>
+
+              {/* Main To Do Card */}
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
-                <div className="flex items-center justify-between mb-4 sm:mb-6">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">✅ API Documentation To Do List</h3>
-                  <span className="text-xs sm:text-sm font-medium px-2 sm:px-3 py-1 sm:py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full">
+                <div className="flex items-center justify-between mb-6 sm:mb-8">
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2">My Tasks</h3>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Keep track of your API documentation work</p>
+                  </div>
+                  <span className="text-2xl sm:text-3xl font-bold px-4 sm:px-6 py-2 sm:py-3 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-lg">
                     {todos.filter(t => !t.completed).length}/{todos.length}
                   </span>
                 </div>
 
                 {/* Add New Todo */}
-                <div className="mb-4 sm:mb-6 space-y-2 sm:space-y-3">
-                  <div className="flex gap-2 sm:gap-3">
+                <div className="mb-6 sm:mb-8 space-y-2 sm:space-y-3">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Add New Task</label>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                     <input
                       type="text"
                       value={newTodo}
                       onChange={(e) => setNewTodo(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && addTodo()}
-                      placeholder="Add a new task..."
+                      placeholder="What needs to be documented?"
                       className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <select
                       value={todoPriority}
                       onChange={(e) => setTodoPriority(e.target.value as 'low' | 'medium' | 'high')}
-                      className="px-2 sm:px-3 py-2 sm:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
+                      <option value="low">🟢 Low Priority</option>
+                      <option value="medium">🟡 Medium Priority</option>
+                      <option value="high">🔴 High Priority</option>
                     </select>
                     <button
                       onClick={addTodo}
-                      className="px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                      className="px-4 sm:px-6 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-semibold whitespace-nowrap"
                     >
-                      Add
+                      Add Task
                     </button>
                   </div>
                 </div>
 
                 {/* Todo List */}
-                <div className="space-y-2 sm:space-y-3 max-h-96 sm:max-h-[500px] overflow-y-auto">
+                <div className="space-y-2 sm:space-y-3">
                   {todos.length === 0 ? (
-                    <div className="text-center py-8 sm:py-12">
-                      <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">No tasks yet. Add one to get started! 🚀</p>
+                    <div className="text-center py-12 sm:py-16">
+                      <p className="text-4xl sm:text-5xl mb-3">🚀</p>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base font-medium">No tasks yet</p>
+                      <p className="text-gray-400 dark:text-gray-500 text-xs sm:text-sm mt-2">Add your first task to get started!</p>
                     </div>
                   ) : (
                     todos.map((todo) => (
                       <div
                         key={todo.id}
-                        className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        className={`flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-lg transition-all border ${
+                          todo.completed
+                            ? 'bg-gray-50 dark:bg-gray-700/30 border-gray-200 dark:border-gray-700'
+                            : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                        }`}
                       >
                         {/* Checkbox */}
                         <input
                           type="checkbox"
                           checked={todo.completed}
                           onChange={() => toggleTodoComplete(todo.id)}
-                          className="w-4 h-4 sm:w-5 sm:h-5 rounded border-gray-300 text-blue-600 cursor-pointer accent-blue-600"
+                          className="w-5 h-5 sm:w-6 sm:h-6 rounded border-gray-300 text-blue-600 cursor-pointer accent-blue-600 flex-shrink-0"
                         />
 
                         {/* Priority Indicator */}
-                        <div className={`w-1.5 sm:w-2 h-6 sm:h-8 rounded-full ${
+                        <div className={`w-2 h-10 sm:h-12 rounded-full flex-shrink-0 ${
                           todo.priority === 'high' ? 'bg-red-500' :
                           todo.priority === 'medium' ? 'bg-yellow-500' :
                           'bg-green-500'
@@ -1731,62 +1755,87 @@ export default function AdminDashboard() {
 
                         {/* Todo Text */}
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm sm:text-base ${
+                          <p className={`text-sm sm:text-base font-medium transition-all ${
                             todo.completed
                               ? 'line-through text-gray-400 dark:text-gray-500'
                               : 'text-gray-900 dark:text-white'
                           }`}>
                             {todo.text}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {new Date(todo.createdAt).toLocaleDateString()}
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            📅 {new Date(todo.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                           </p>
                         </div>
 
-                        {/* Priority Selector */}
-                        <select
-                          value={todo.priority}
-                          onChange={(e) => updateTodoPriority(todo.id, e.target.value as 'low' | 'medium' | 'high')}
-                          className="px-2 sm:px-3 py-1 sm:py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="low">Low</option>
-                          <option value="medium">Med</option>
-                          <option value="high">High</option>
-                        </select>
+                        {/* Priority Badge */}
+                        <span className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-semibold flex-shrink-0 ${
+                          todo.priority === 'high' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
+                          todo.priority === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
+                          'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                        }`}>
+                          {todo.priority === 'high' ? 'High' : todo.priority === 'medium' ? 'Med' : 'Low'}
+                        </span>
 
-                        {/* Delete Button */}
-                        <button
-                          onClick={() => deleteTodo(todo.id)}
-                          className="px-2 sm:px-3 py-1 sm:py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
-                        >
-                          Delete
-                        </button>
+                        {/* Actions */}
+                        <div className="flex gap-2 sm:gap-3 flex-shrink-0">
+                          <select
+                            value={todo.priority}
+                            onChange={(e) => updateTodoPriority(todo.id, e.target.value as 'low' | 'medium' | 'high')}
+                            className="px-2 sm:px-3 py-1 sm:py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent hidden sm:block"
+                            title="Change priority"
+                          >
+                            <option value="low">Low</option>
+                            <option value="medium">Med</option>
+                            <option value="high">High</option>
+                          </select>
+                          <button
+                            onClick={() => deleteTodo(todo.id)}
+                            className="px-2 sm:px-3 py-1 sm:py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors flex-shrink-0"
+                            title="Delete task"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
                 </div>
 
-                {/* Summary */}
+                {/* Summary Stats */}
                 {todos.length > 0 && (
-                  <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                      <div className="text-center">
-                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total</p>
-                        <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{todos.length}</p>
+                  <div className="mt-8 sm:mt-10 pt-6 sm:pt-8 border-t border-gray-200 dark:border-gray-700">
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Progress Summary</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                      <div className="bg-gray-50 dark:bg-gray-700/50 p-3 sm:p-4 rounded-lg text-center">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total Tasks</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{todos.length}</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Remaining</p>
-                        <p className="text-lg sm:text-xl font-bold text-blue-600">{todos.filter(t => !t.completed).length}</p>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 p-3 sm:p-4 rounded-lg text-center border border-blue-200 dark:border-blue-800">
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Remaining</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-300">{todos.filter(t => !t.completed).length}</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Completed</p>
-                        <p className="text-lg sm:text-xl font-bold text-green-600">{todos.filter(t => t.completed).length}</p>
+                      <div className="bg-green-50 dark:bg-green-900/20 p-3 sm:p-4 rounded-lg text-center border border-green-200 dark:border-green-800">
+                        <p className="text-xs text-green-600 dark:text-green-400 mb-1">Completed</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-300">{todos.filter(t => t.completed).length}</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Completion</p>
-                        <p className="text-lg sm:text-xl font-bold text-purple-600">
+                      <div className="bg-purple-50 dark:bg-purple-900/20 p-3 sm:p-4 rounded-lg text-center border border-purple-200 dark:border-purple-800">
+                        <p className="text-xs text-purple-600 dark:text-purple-400 mb-1">Completion %</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-300">
                           {todos.length > 0 ? Math.round((todos.filter(t => t.completed).length / todos.length) * 100) : 0}%
                         </p>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="mt-4 sm:mt-6">
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Overall Progress</p>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 sm:h-4 overflow-hidden">
+                        <div 
+                          className="bg-gradient-to-r from-blue-500 to-purple-500 h-full transition-all duration-300"
+                          style={{ 
+                            width: `${todos.length > 0 ? Math.round((todos.filter(t => t.completed).length / todos.length) * 100) : 0}%` 
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
