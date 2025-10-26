@@ -90,7 +90,55 @@ export default function SettingsPage() {
   }, [router]);
 
   const handleProfileUpdate = async () => {
-    // Show 2FA verification dialog instead of directly updating
+    // If 2FA is not enabled, directly update the profile
+    if (!twoFAEnabled) {
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:8002/api/auth/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            username: profileData.username,
+            full_name: profileData.full_name,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          setErrorMessage(error.detail || 'Failed to update profile');
+          setIsLoading(false);
+          return;
+        }
+
+        const data = await response.json();
+        
+        const updatedUser: UserData = {
+          id: user!.id,
+          role: user!.role,
+          email: user!.email,
+          username: data.user.username,
+          full_name: data.user.full_name,
+          organization: user!.organization,
+        };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        setIsEditingProfile(false);
+        setSavedMessage('Profile updated successfully!');
+        setErrorMessage('');
+        setTimeout(() => setSavedMessage(''), 3000);
+        setIsLoading(false);
+      } catch (error) {
+        setErrorMessage('Failed to update profile');
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Show 2FA verification dialog if 2FA is enabled
     setPendingAction('profile');
     setShowTwoFAVerification(true);
     setTwoFAVerificationCode('');
@@ -129,10 +177,13 @@ export default function SettingsPage() {
 
         const data = await response.json();
         
-        const updatedUser = {
-          ...user,
-          full_name: data.user.full_name,
+        const updatedUser: UserData = {
+          id: user.id,
+          role: user.role,
+          email: user.email,
           username: data.user.username,
+          full_name: data.user.full_name,
+          organization: user.organization,
         };
         localStorage.setItem('user', JSON.stringify(updatedUser));
         setUser(updatedUser);
@@ -168,12 +219,61 @@ export default function SettingsPage() {
   };
 
   const handlePasswordChange = async () => {
-    // Show 2FA verification dialog instead of directly changing password
+    // Validate password fields first
+    if (!passwordData.currentPassword || !passwordData.newPassword) {
+      setErrorMessage('Please fill in all password fields');
+      return;
+    }
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setErrorMessage('New passwords do not match');
+      return;
+    }
+
+    // If 2FA is not enabled, directly change the password
+    if (!twoFAEnabled) {
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:8002/api/auth/change-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            current_password: passwordData.currentPassword,
+            new_password: passwordData.newPassword,
+          }),
+        });
+
+        if (response.ok) {
+          setSavedMessage('Password changed successfully!');
+          setPasswordData({
+            currentPassword: '',
+            newPassword: '',
+            confirmPassword: '',
+          });
+          setIsChangingPassword(false);
+          setErrorMessage('');
+          setTimeout(() => setSavedMessage(''), 3000);
+        } else {
+          const data = await response.json();
+          setErrorMessage(data.detail || 'Failed to change password');
+        }
+      } catch (error) {
+        setErrorMessage('Error changing password. Please try again.');
+        console.error('Password change error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Show 2FA verification dialog if 2FA is enabled
     setPendingAction('password');
     setShowTwoFAVerification(true);
     setTwoFAVerificationCode('');
     setErrorMessage('');
-    setIsChangingPassword(false);
   };
 
   const handleConfirmPasswordChange = async () => {

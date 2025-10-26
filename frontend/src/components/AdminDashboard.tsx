@@ -104,6 +104,10 @@ export default function AdminDashboard() {
   const router = useRouter();
 
   useEffect(() => {
+    checkAuthentication();
+  }, []);
+
+  useEffect(() => {
     // Initialize dark mode from localStorage
     const savedTheme = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
