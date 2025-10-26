@@ -573,17 +573,17 @@ export default function MessengerView() {
       {/* Conversations List */}
       <div className="w-1/3 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800">
         {/* Search */}
-        <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-2 border-b border-gray-200 dark:border-gray-700">
           <div className="relative">
             <input
               type="text"
-              placeholder="Search conversations or users..."
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 bg-gray-100 dark:bg-gray-700 border-0 rounded-lg text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
+              className="w-full pl-7 pr-2 py-1.5 bg-gray-100 dark:bg-gray-700 border-0 rounded-lg text-xs placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
             />
             <svg
-              className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400"
+              className="absolute left-2 top-1.5 w-3 h-3 text-gray-400"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -604,36 +604,36 @@ export default function MessengerView() {
             <div className="flex">
               <button
                 onClick={() => setActiveTab('conversations')}
-                className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
                   activeTab === 'conversations'
                     ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-gray-700'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
-                💬 Conversations
+                💬 Chat
               </button>
               <button
                 onClick={() => setActiveTab('users')}
-                className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
                   activeTab === 'users'
                     ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-gray-700'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
-                👥 Team ({organizationUsers.length})
+                👥 Team
               </button>
             </div>
             {/* Create Group Button */}
             {activeTab === 'conversations' && (
-              <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-700">
+              <div className="px-2 py-1 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => setShowGroupModal(true)}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-medium transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
-                  Create Group
+                  Group
                 </button>
               </div>
             )}
@@ -644,30 +644,30 @@ export default function MessengerView() {
         {searchQuery && (
           <div className="flex-1 overflow-y-auto">
             {isSearching ? (
-              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                Searching...
+              <div className="p-2 text-center text-gray-500 dark:text-gray-400">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto mb-1"></div>
+                <span className="text-xs">Searching...</span>
               </div>
             ) : searchResults.length > 0 ? (
               <div>
-                <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">
+                <div className="px-2 py-1 text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">
                   Users
                 </div>
                 {searchResults.map((user) => (
                   <button
                     key={user.id}
                     onClick={() => startConversation(user.id)}
-                    className="w-full p-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 text-left transition-colors"
+                    className="w-full px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 text-left transition-colors"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
                         {user.full_name.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 dark:text-white truncate">
+                        <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
                           {user.full_name}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
                           @{user.username}
                         </div>
                       </div>
@@ -676,7 +676,7 @@ export default function MessengerView() {
                 ))}
               </div>
             ) : (
-              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+              <div className="p-2 text-center text-xs text-gray-500 dark:text-gray-400">
                 No users found for "{searchQuery}"
               </div>
             )}
@@ -701,14 +701,14 @@ export default function MessengerView() {
                     <button
                       key={conversation.id}
                       onClick={() => setSelectedConversation(conversation)}
-                      className={`w-full p-3 border-b border-gray-100 dark:border-gray-700 text-left transition-colors ${
+                      className={`w-full px-2 py-1.5 border-b border-gray-100 dark:border-gray-700 text-left transition-colors ${
                         selectedConversation?.id === conversation.id
                           ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
                           : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium ${
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
                           conversation.is_group 
                             ? 'bg-gradient-to-br from-purple-500 to-pink-600' 
                             : 'bg-gray-500'
@@ -716,28 +716,28 @@ export default function MessengerView() {
                           {conversation.is_group ? '👥' : displayName.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <div className="font-medium text-gray-900 dark:text-white truncate">
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">
                               {displayName}
                               {conversation.is_group && (
-                                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                                  ({memberCount} members)
+                                <span className="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
+                                  ({memberCount})
                                 </span>
                               )}
                             </div>
                             {conversation.last_message && (
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                              <div className="text-[9px] text-gray-500 dark:text-gray-400 flex-shrink-0">
                                 {formatTimestamp(conversation.last_message.timestamp)}
                               </div>
                             )}
                           </div>
                           {conversation.last_message && (
-                            <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                            <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
                               {conversation.last_message.content}
                             </div>
                           )}
                           {conversation.unread_count && conversation.unread_count > 0 && (
-                            <div className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full mt-1 inline-block">
+                            <div className="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
                               {conversation.unread_count}
                             </div>
                           )}
@@ -764,24 +764,24 @@ export default function MessengerView() {
                   <button
                     key={user.id}
                     onClick={() => startConversation(user.id)}
-                    className="w-full p-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 text-left transition-colors"
+                    className="w-full px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 text-left transition-colors"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <div className="relative flex-shrink-0">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
                           {user.full_name.charAt(0).toUpperCase()}
                         </div>
                         {/* Online status indicator */}
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-gray-800 ${
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-gray-800 ${
                           user.is_online ? 'bg-green-500' : 'bg-gray-400'
                         }`}></div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div className="font-medium text-gray-900 dark:text-white truncate">
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">
                             {user.full_name}
                           </div>
-                          <div className={`text-xs px-2 py-1 rounded-full ${
+                          <div className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                             user.is_online 
                               ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' 
                               : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
@@ -789,11 +789,11 @@ export default function MessengerView() {
                             {user.is_online ? 'Online' : 'Offline'}
                           </div>
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
                           @{user.username}
                         </div>
                         {!user.is_online && user.last_seen && (
-                          <div className="text-xs text-gray-400 dark:text-gray-500">
+                          <div className="text-[9px] text-gray-400 dark:text-gray-500">
                             Last seen {formatTimestamp(user.last_seen)}
                           </div>
                         )}
@@ -822,9 +822,9 @@ export default function MessengerView() {
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium ${
+            <div className="p-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium ${
                   selectedConversation.is_group 
                     ? 'bg-gradient-to-br from-purple-500 to-pink-600' 
                     : 'bg-gray-500'
@@ -835,8 +835,8 @@ export default function MessengerView() {
                     return displayName.charAt(0).toUpperCase();
                   })()}
                 </div>
-                <div>
-                  <div className="font-medium text-gray-900 dark:text-white">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">
                     {(() => {
                       const otherParticipant = selectedConversation.participants?.find(p => p.id !== currentUser?.id);
                       const displayName = selectedConversation.is_group 
@@ -845,14 +845,14 @@ export default function MessengerView() {
                       return displayName;
                     })()}
                     {selectedConversation.is_group && (
-                      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                        ({selectedConversation.participants?.length || 0} members)
+                      <span className="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
+                        ({selectedConversation.participants?.length || 0})
                       </span>
                     )}
                   </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <div className="text-[10px] text-gray-500 dark:text-gray-400">
                     {selectedConversation.is_group 
-                      ? `Group chat • ${wsConnection ? 'Connected' : 'Connecting...'}`
+                      ? `Group • ${wsConnection ? 'Connected' : 'Connecting...'}`
                       : (wsConnection ? 'Connected' : 'Connecting...')
                     }
                   </div>
@@ -861,50 +861,50 @@ export default function MessengerView() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex gap-2 ${
+                  className={`flex gap-1 ${
                     message.sender_id === currentUser?.id ? 'justify-end' : 'justify-start'
                   }`}
                 >
                   {message.sender_id !== currentUser?.id && (
-                    <div className="w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                    <div className="w-6 h-6 bg-gray-500 rounded-full flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
                       {message.sender?.full_name?.charAt(0).toUpperCase() || '?'}
                     </div>
                   )}
                   
-                  <div className={`max-w-[70%] rounded-lg px-3 py-2 ${
+                  <div className={`max-w-[70%] rounded px-2 py-1 text-xs ${
                     message.sender_id === currentUser?.id
                       ? 'bg-blue-600 text-white'
                       : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600'
                   }`}>
                     {/* Message content */}
                     {message.content && (
-                      <div className="text-sm">{message.content}</div>
+                      <div>{message.content}</div>
                     )}
                     
                     {/* File attachments */}
                     {message.attachments && message.attachments.length > 0 && (
-                      <div className={`${message.content ? 'mt-2' : ''} space-y-2`}>
+                      <div className={`${message.content ? 'mt-1' : ''} space-y-1`}>
                         {message.attachments.map((attachment, index) => (
                           <div
                             key={index}
-                            className={`flex items-center gap-2 p-2 rounded border ${
+                            className={`flex items-center gap-1.5 p-1 rounded text-[9px] border ${
                               message.sender_id === currentUser?.id
                                 ? 'bg-blue-700 border-blue-500'
                                 : 'bg-gray-50 dark:bg-gray-600 border-gray-200 dark:border-gray-500'
                             }`}
                           >
-                            <span className="text-lg">
+                            <span className="text-sm">
                               {getFileIcon(attachment.content_type)}
                             </span>
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">
+                              <div className="font-medium truncate">
                                 {attachment.original_filename}
                               </div>
-                              <div className={`text-xs ${
+                              <div className={`text-[8px] ${
                                 message.sender_id === currentUser?.id ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
                               }`}>
                                 {formatFileSize(attachment.file_size)}
@@ -913,7 +913,7 @@ export default function MessengerView() {
                             <a
                               href={`${API_BASE}${attachment.upload_url}`}
                               download={attachment.original_filename}
-                              className={`p-1 rounded hover:bg-opacity-80 transition-colors ${
+                              className={`p-0.5 rounded hover:bg-opacity-80 transition-colors flex-shrink-0 ${
                                 message.sender_id === currentUser?.id
                                   ? 'text-blue-100 hover:bg-blue-800'
                                   : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-500'
@@ -929,7 +929,7 @@ export default function MessengerView() {
                       </div>
                     )}
                     
-                    <div className={`text-xs mt-1 ${
+                    <div className={`text-[8px] mt-0.5 ${
                       message.sender_id === currentUser?.id ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
                     }`}>
                       {formatTimestamp(message.timestamp)}
@@ -937,12 +937,12 @@ export default function MessengerView() {
 
                     {/* Reactions Display */}
                     {message.reactions && Object.keys(message.reactions).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
+                      <div className="flex flex-wrap gap-0.5 mt-1">
                         {getReactionSummary(message.reactions).map((reaction) => (
                           <button
                             key={reaction.emoji}
                             onClick={() => addReaction(message.id, reaction.emoji)}
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium transition-colors ${
                               reaction.hasCurrentUser
                                 ? message.sender_id === currentUser?.id
                                   ? 'bg-blue-500 text-white'
@@ -994,30 +994,30 @@ export default function MessengerView() {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors ${
+              className={`p-2 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors ${
                 isDraggingFile ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400' : ''
               }`}>
               {/* File preview */}
               {selectedFile && (
-                <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 flex-1">
+                <div className="mb-2 p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div className="flex items-start gap-1.5 flex-1">
                       {/* Image thumbnail preview */}
                       {filePreviewUrl && (
                         <img 
                           src={filePreviewUrl} 
                           alt="preview" 
-                          className="w-12 h-12 object-cover rounded border border-gray-300 dark:border-gray-500"
+                          className="w-8 h-8 object-cover rounded border border-gray-300 dark:border-gray-500"
                         />
                       )}
                       {!filePreviewUrl && (
-                        <span className="text-2xl">{getFileIcon(selectedFile.type)}</span>
+                        <span className="text-lg">{getFileIcon(selectedFile.type)}</span>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
                           {selectedFile.name}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                        <div className="text-[9px] text-gray-500 dark:text-gray-400">
                           {formatFileSize(selectedFile.size)}
                         </div>
                       </div>
@@ -1030,9 +1030,9 @@ export default function MessengerView() {
                           fileInputRef.current.value = '';
                         }
                       }}
-                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+                      className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded flex-shrink-0"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
@@ -1040,15 +1040,15 @@ export default function MessengerView() {
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 {/* File attachment button */}
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
-                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0"
                   title="Attach file"
                 >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                   </svg>
                 </button>
@@ -1058,25 +1058,25 @@ export default function MessengerView() {
                   value={newMessage}
                   onChange={handleMessageInputChange}
                   onKeyPress={handleKeyPress}
-                  placeholder={selectedFile ? "Add a message to your file..." : "Type a message..."}
-                  className="flex-1 resize-none border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm min-h-[40px] max-h-[120px]"
+                  placeholder={selectedFile ? "Add a message..." : "Type a message..."}
+                  className="flex-1 resize-none border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs min-h-[32px] max-h-[80px]"
                   rows={1}
                 />
                 
                 <button
                   onClick={sendMessage}
                   disabled={(!newMessage.trim() && !selectedFile) || isUploading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm flex items-center gap-2"
+                  className="px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded font-medium transition-colors text-xs flex items-center gap-1 flex-shrink-0"
                 >
                   {isUploading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Sending...</span>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                      <span className="hidden sm:inline">Send</span>
                     </>
                   ) : (
                     <>
-                      <span>Send</span>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <span className="hidden sm:inline">Send</span>
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                       </svg>
                     </>
@@ -1096,17 +1096,17 @@ export default function MessengerView() {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="text-center px-4">
+              <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-2">
+                <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.003 9.003 0 01-8.716-6.747M3 12c0-4.418 4.03-8 9-8a8.997 8.997 0 018.716 6.747M21 12H3" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
                 Select a Conversation
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Choose a conversation from the list or search for users to start chatting
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                Choose a chat or search for users
               </p>
             </div>
           </div>
@@ -1116,10 +1116,10 @@ export default function MessengerView() {
       {/* Group Creation Modal */}
       {showGroupModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Create Group Chat
+          <div className="bg-white dark:bg-gray-800 rounded p-3 w-full max-w-sm mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Create Group
               </h3>
               <button
                 onClick={() => {
@@ -1127,71 +1127,71 @@ export default function MessengerView() {
                   setSelectedUsers([]);
                   setGroupName('');
                 }}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
               >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
             {/* Group Name Input */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Group Name
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Name
               </label>
               <input
                 type="text"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                placeholder="Enter group name..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                placeholder="Group name..."
+                className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               />
             </div>
 
             {/* User Selection */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Select Members ({selectedUsers.length})
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Members ({selectedUsers.length})
               </label>
-              <div className="max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg">
+              <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded">
                 {organizationUsers.map((user) => (
                   <button
                     key={user.id}
                     onClick={() => toggleUserSelection(user)}
-                    className={`w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors ${
+                    className={`w-full px-2 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors text-xs ${
                       selectedUsers.find(u => u.id === user.id) 
                         ? 'bg-blue-50 dark:bg-blue-900/20' 
                         : ''
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <div className="relative flex-shrink-0">
+                        <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
                           {user.full_name.charAt(0).toUpperCase()}
                         </div>
                         {selectedUsers.find(u => u.id === user.id) && (
-                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
-                            <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-600 rounded-full flex items-center justify-center">
+                            <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
                           </div>
                         )}
                       </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900 dark:text-white text-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 dark:text-white">
                           {user.full_name}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                        <div className="text-[9px] text-gray-500 dark:text-gray-400">
                           @{user.username}
                         </div>
                       </div>
-                      <div className={`text-xs px-2 py-1 rounded-full ${
+                      <div className={`text-[9px] px-1 py-0.5 rounded flex-shrink-0 ${
                         user.is_online 
                           ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' 
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                       }`}>
-                        {user.is_online ? 'Online' : 'Offline'}
+                        {user.is_online ? 'On' : 'Off'}
                       </div>
                     </div>
                   </button>
@@ -1200,23 +1200,23 @@ export default function MessengerView() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 onClick={() => {
                   setShowGroupModal(false);
                   setSelectedUsers([]);
                   setGroupName('');
                 }}
-                className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                className="flex-1 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={createGroupConversation}
                 disabled={selectedUsers.length < 2 || !groupName.trim()}
-                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                className="flex-1 px-2 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded transition-colors"
               >
-                Create Group
+                Create
               </button>
             </div>
           </div>
