@@ -43,10 +43,9 @@ class UserRole(enum.Enum):
 
 class SubscriptionPlan(enum.Enum):
     """Subscription plan types with limits"""
-    FREE = "free"            # 10 users, 1,000 chats/month
-    BASIC = "basic"          # 20 users, 5,000 chats/month
-    PREMIUM = "premium"      # 50 users, 25,000 chats/month
-    ENTERPRISE = "enterprise"  # Unlimited
+    FREE = "free"                    # 10 users, 1,000 chats/month - Trial/Testing
+    SMALL_BUSINESS = "small_business"  # 20 users, 5,000 chats/month - Small Teams
+    ENTERPRISE = "enterprise"          # 100+ users, 50,000+ chats/month - Large Organizations
 
 
 class UserStatus(enum.Enum):

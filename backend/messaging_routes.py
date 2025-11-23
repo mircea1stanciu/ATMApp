@@ -115,7 +115,9 @@ class ConnectionManager:
                     pass
 
     async def broadcast_to_organization(self, message: dict, organization_id: int, exclude_user_id: Optional[int] = None):
-        for user_id, user_org_id in self.user_organizations.items():
+        # Create a copy to avoid "dictionary changed size during iteration" error
+        user_orgs = dict(self.user_organizations)
+        for user_id, user_org_id in user_orgs.items():
             if user_org_id == organization_id and user_id != exclude_user_id:
                 await self.send_personal_message(message, user_id)
 
@@ -126,8 +128,11 @@ class ConnectionManager:
             ConversationParticipant.is_active == True
         ).all()
         
+        print(f"DEBUG broadcast_to_conversation: Found {len(participants)} active participants for conversation {conversation_id}")
+        
         for participant in participants:
             if participant.user_id != exclude_user_id:
+                print(f"DEBUG: Sending message to user {participant.user_id}, connected: {participant.user_id in self.active_connections}")
                 await self.send_personal_message(message, participant.user_id)
 
 manager = ConnectionManager()
@@ -302,6 +307,9 @@ async def get_conversation_detail(
     db: Session = Depends(get_db)
 ):
     """Get detailed conversation info with messages"""
+    # Debug logging
+    print(f"DEBUG get_conversation_detail: conversation_id={conversation_id}, user_id={current_user.id}")
+    
     # Verify user is participant
     participant = db.query(ConversationParticipant).filter(
         ConversationParticipant.conversation_id == conversation_id,
@@ -309,7 +317,19 @@ async def get_conversation_detail(
         ConversationParticipant.is_active == True
     ).first()
     
+    print(f"DEBUG: Found participant: {participant is not None}")
+    if participant:
+        print(f"DEBUG: Participant is_active={participant.is_active}")
+    
     if not participant:
+        # Check if participant exists at all (without is_active filter)
+        any_participant = db.query(ConversationParticipant).filter(
+            ConversationParticipant.conversation_id == conversation_id,
+            ConversationParticipant.user_id == current_user.id
+        ).first()
+        print(f"DEBUG: Any participant (without is_active filter): {any_participant is not None}")
+        if any_participant:
+            print(f"DEBUG: Any participant is_active={any_participant.is_active}")
         raise HTTPException(status_code=404, detail="Conversation not found")
     
     conversation = db.query(Conversation).filter(
@@ -433,6 +453,18 @@ async def create_conversation(
         ).first()
         
         if existing:
+            # Reactivate all participants in case conversation was previously deleted
+            existing_participants = db.query(ConversationParticipant).filter(
+                ConversationParticipant.conversation_id == existing.id
+            ).all()
+            
+            for participant in existing_participants:
+                if not participant.is_active:
+                    participant.is_active = True
+                    print(f"DEBUG: Reactivated participant user_id={participant.user_id} for conversation {existing.id}")
+            
+            db.commit()
+            
             # Return existing conversation
             return await get_conversation_detail(existing.id, current_user, db)
     
@@ -450,20 +482,71 @@ async def create_conversation(
     for participant in participants:
         conv_participant = ConversationParticipant(
             conversation_id=conversation.id,
-            user_id=participant.id
+            user_id=participant.id,
+            is_active=True  # Explicitly set to True
         )
         db.add(conv_participant)
     
     db.commit()
+    db.refresh(conversation)
+    
+    # Debug: Log conversation creation
+    print(f"DEBUG: Created conversation {conversation.id} with {len(participants)} participants")
+    
+    # Verify participants were created
+    created_participants = db.query(ConversationParticipant).filter(
+        ConversationParticipant.conversation_id == conversation.id
+    ).all()
+    print(f"DEBUG: Found {len(created_participants)} participants in DB")
+    for p in created_participants:
+        print(f"DEBUG: Participant user_id={p.user_id}, is_active={p.is_active}")
     
     # Broadcast conversation creation to participants
-    await manager.broadcast_to_conversation({
+    broadcast_message = {
         "type": "conversation_created",
         "conversation_id": conversation.id,
         "created_by": current_user.id
-    }, conversation.id, db)
+    }
+    print(f"DEBUG: Broadcasting conversation_created to conversation {conversation.id}")
+    await manager.broadcast_to_conversation(broadcast_message, conversation.id, db)
+    print(f"DEBUG: Broadcast complete")
     
     return await get_conversation_detail(conversation.id, current_user, db)
+
+
+@router.delete("/conversations/{conversation_id}")
+async def delete_conversation(
+    conversation_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a conversation (mark participant as inactive)"""
+    # Verify user is participant
+    participant = db.query(ConversationParticipant).filter(
+        ConversationParticipant.conversation_id == conversation_id,
+        ConversationParticipant.user_id == current_user.id
+    ).first()
+    
+    if not participant:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Mark participant as inactive (soft delete)
+    participant.is_active = False
+    db.commit()
+    
+    # If all participants are inactive, we could also mark the conversation as deleted
+    active_participants = db.query(ConversationParticipant).filter(
+        ConversationParticipant.conversation_id == conversation_id,
+        ConversationParticipant.is_active == True
+    ).count()
+    
+    if active_participants == 0:
+        conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+        if conversation:
+            # Could add a deleted flag or just leave it
+            pass
+    
+    return {"success": True, "message": "Conversation deleted"}
 
 
 @router.post("/conversations/{conversation_id}/messages", response_model=MessageResponse)
@@ -526,6 +609,82 @@ async def send_message(
     }, conversation_id, db, exclude_user_id=current_user.id)
     
     return message_response
+
+
+@router.get("/conversations/{conversation_id}/messages", response_model=List[MessageResponse])
+async def get_conversation_messages(
+    conversation_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all messages from a conversation"""
+    # Verify user is participant
+    participant = db.query(ConversationParticipant).filter(
+        ConversationParticipant.conversation_id == conversation_id,
+        ConversationParticipant.user_id == current_user.id,
+        ConversationParticipant.is_active == True
+    ).first()
+    
+    if not participant:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Get messages
+    messages = db.query(Message).filter(
+        Message.conversation_id == conversation_id
+    ).options(
+        joinedload(Message.sender)
+    ).order_by(Message.created_at).all()
+    
+    result = []
+    for msg in messages:
+        # Create attachment if file exists
+        attachments = []
+        if msg.file_url:
+            attachments.append(FileAttachment(
+                id=msg.id,
+                filename=msg.file_url.split('/')[-1],
+                original_filename=msg.file_name or msg.file_url.split('/')[-1],
+                file_size=msg.file_size or 0,
+                content_type=msg.file_type or 'application/octet-stream',
+                upload_url=msg.file_url
+            ))
+        
+        # Get reactions for this message
+        from core.database import MessageReaction
+        reactions_query = db.query(MessageReaction).filter(
+            MessageReaction.message_id == msg.id
+        ).all()
+        
+        reaction_counts = {}
+        for reaction in reactions_query:
+            if reaction.emoji not in reaction_counts:
+                reaction_counts[reaction.emoji] = []
+            reaction_counts[reaction.emoji].append({
+                "user_id": reaction.user_id,
+                "username": reaction.user.username
+            })
+            
+        result.append(MessageResponse(
+            id=msg.id,
+            content=msg.content,
+            message_type=msg.message_type.value,
+            sender_id=msg.sender_id,
+            sender_username=msg.sender.username,
+            sender_full_name=msg.sender.full_name or msg.sender.username,
+            created_at=msg.created_at,
+            edited=msg.edited,
+            edited_at=msg.edited_at,
+            reply_to_message_id=msg.reply_to_message_id,
+            attachments=attachments,
+            reactions=reaction_counts
+        ))
+    
+    # Mark as read
+    if result:
+        participant.last_read_message_id = result[-1].id
+        db.commit()
+    
+    return result
 
 
 # File upload configuration

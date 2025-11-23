@@ -29,6 +29,7 @@ interface User {
   assigned_communities?: string; // JSON string for community leads
   is_active: boolean;
   last_login?: string;
+  two_fa_enabled?: boolean; // Two-factor authentication status
   organization?: { 
     id: number;
     name: string;
@@ -833,6 +834,30 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDisable2FA = async (user: User) => {
+    if (!user.two_fa_enabled) {
+      alert('ℹ️ Two-factor authentication is already disabled for this user.');
+      return;
+    }
+
+    if (!confirm(`🔐 Disable Two-Factor Authentication?\n\nYou are about to disable 2FA for:\n• User: ${user.username}\n• Email: ${user.email}\n\nThis will remove their 2FA protection. They can re-enable it from their settings.\n\nDo you want to continue?`)) {
+      return;
+    }
+
+    try {
+      const response = await apiCall(`/api/users/${user.id}/2fa/disable`, {
+        method: 'POST'
+      });
+
+      alert(`✅ ${response.message}`);
+      
+      // Reload users to reflect the change
+      await loadUsers();
+    } catch (error) {
+      alert('Failed to disable 2FA: ' + (error as Error).message);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -1341,6 +1366,7 @@ export default function AdminDashboard() {
                             </th>
                             <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Communities</th>
                             <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Status</th>
+                            <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">2FA</th>
                             <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Last Login</th>
                             <th className="text-left py-2 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Actions</th>
                           </tr>
@@ -1392,6 +1418,13 @@ export default function AdminDashboard() {
                                   {user.is_active ? 'ACTIVE' : 'INACTIVE'}
                                 </span>
                               </td>
+                              <td className="py-3">
+                                <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium ${
+                                  user.two_fa_enabled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                                }`}>
+                                  {user.two_fa_enabled ? '🔐 Enabled' : '🔓 Disabled'}
+                                </span>
+                              </td>
                               <td className="py-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                                 {user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
                               </td>
@@ -1417,13 +1450,26 @@ export default function AdminDashboard() {
                                   >
                                     ✏️ Edit
                                   </button>
-                                  {currentUser?.role === 'super_admin' && user.role !== 'super_admin' && user.id !== currentUser.id && (
-                                    <button
-                                      onClick={() => handleDeleteUser(user)}
-                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs sm:text-sm font-medium"
-                                    >
-                                      🗑️ Delete
-                                    </button>
+                                  {(currentUser?.role === 'super_admin' || currentUser?.role === 'org_admin') && user.id !== currentUser.id && (
+                                    <>
+                                      {user.two_fa_enabled && (
+                                        <button
+                                          onClick={() => handleDisable2FA(user)}
+                                          className="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300 text-xs sm:text-sm font-medium"
+                                          title="Disable Two-Factor Authentication"
+                                        >
+                                          🔓 Disable 2FA
+                                        </button>
+                                      )}
+                                      {currentUser?.role === 'super_admin' && user.role !== 'super_admin' && (
+                                        <button
+                                          onClick={() => handleDeleteUser(user)}
+                                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs sm:text-sm font-medium"
+                                        >
+                                          🗑️ Delete
+                                        </button>
+                                      )}
+                                    </>
                                   )}
                                 </div>
                               </td>
@@ -1670,6 +1716,207 @@ export default function AdminDashboard() {
                   <div className="ml-12 sm:ml-24 flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                     <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-green-600 text-white rounded text-[10px] sm:text-xs font-bold">USER</span>
                     <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Access assigned communities only</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Feature Flags & Subscription API */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">🎯 Feature Flags & Subscription API</h3>
+                
+                <div className="space-y-3 sm:space-y-4">
+                  {/* Get User Features */}
+                  <div className="border-l-4 border-blue-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded text-[10px] sm:text-xs font-bold">GET</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/features</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Get all available features for current user&apos;s subscription</p>
+                    <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded overflow-x-auto">{`{
+  "subscription_plan": "enterprise",
+  "available_features": [
+    "basic_chat", "user_management", "custom_branding",
+    "advanced_analytics", "priority_support", "sso_saml",
+    "api_access", "audit_logs"
+  ],
+  "plan_limits": {
+    "max_users": 100,
+    "max_chat_sessions": 50000,
+    "storage_gb": 100,
+    "ai_models": ["gpt-4", "gpt-4o", "claude-3"]
+  }
+}`}</pre>
+                  </div>
+
+                  {/* Compare Plans */}
+                  <div className="border-l-4 border-purple-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded text-[10px] sm:text-xs font-bold">GET</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/features/compare</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Compare all subscription plans and their features</p>
+                    <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded overflow-x-auto">{`{
+  "plans": {
+    "free": {
+      "features": ["basic_chat", "user_management"],
+      "limits": { "max_users": 10, "max_chat_sessions": 1000 }
+    },
+    "small_business": {
+      "features": ["basic_chat", "custom_branding", "basic_analytics"],
+      "limits": { "max_users": 20, "max_chat_sessions": 5000 }
+    },
+    "enterprise": {
+      "features": ["all_features"],
+      "limits": { "max_users": 100, "max_chat_sessions": 50000 }
+    }
+  }
+}`}</pre>
+                  </div>
+
+                  {/* Check Feature Access */}
+                  <div className="border-l-4 border-green-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-[10px] sm:text-xs font-bold">POST</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/features/{`{feature_name}`}/check</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Check if current user has access to a specific feature</p>
+                  </div>
+
+                  {/* Get Subscription Plans */}
+                  <div className="border-l-4 border-orange-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded text-[10px] sm:text-xs font-bold">GET</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/subscription-plans</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Get detailed information about all subscription plans</p>
+                    <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded overflow-x-auto">{`{
+  "plans": [
+    {
+      "name": "free",
+      "display_name": "Free",
+      "price": 0,
+      "features": [...],
+      "limits": {...}
+    },
+    {
+      "name": "small_business",
+      "display_name": "Small Business",
+      "price": 49,
+      "features": [...],
+      "limits": {...}
+    }
+  ]
+}`}</pre>
+                  </div>
+
+                  {/* Update Subscription (Super Admin) */}
+                  <div className="border-l-4 border-yellow-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded text-[10px] sm:text-xs font-bold">PATCH</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/organizations/{`{org_id}`}/subscription</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Update organization subscription plan (Super Admin only)</p>
+                    <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded overflow-x-auto">{`{
+  "subscription_plan": "enterprise"  // free, small_business, enterprise
+}`}</pre>
+                  </div>
+                </div>
+
+                {/* Subscription Tiers */}
+                <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <h4 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white mb-3">📊 Subscription Tiers</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+                      <div className="font-bold text-sm text-gray-900 dark:text-white mb-1">FREE</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                        <div>• 10 users max</div>
+                        <div>• 1,000 chat sessions</div>
+                        <div>• Basic features only</div>
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border-2 border-blue-500">
+                      <div className="font-bold text-sm text-blue-900 dark:text-blue-300 mb-1">SMALL_BUSINESS</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                        <div>• 20 users max</div>
+                        <div>• 5,000 chat sessions</div>
+                        <div>• Custom branding + Analytics</div>
+                      </div>
+                    </div>
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg border-2 border-purple-500">
+                      <div className="font-bold text-sm text-purple-900 dark:text-purple-300 mb-1">ENTERPRISE</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                        <div>• 100 users max</div>
+                        <div>• 50,000 chat sessions</div>
+                        <div>• All features + Priority support</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2FA Management API */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">🔐 2FA Management API</h3>
+                
+                <div className="space-y-3 sm:space-y-4">
+                  {/* Setup 2FA */}
+                  <div className="border-l-4 border-blue-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-[10px] sm:text-xs font-bold">POST</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/auth/2fa/setup</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Generate QR code for 2FA setup</p>
+                    <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded overflow-x-auto">{`// Response
+{
+  "qr_code": "base64_encoded_qr_image",
+  "secret": "ABCD1234...",
+  "enabled": false
+}`}</pre>
+                  </div>
+
+                  {/* Enable 2FA */}
+                  <div className="border-l-4 border-green-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-[10px] sm:text-xs font-bold">POST</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/auth/2fa/enable</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Enable 2FA with verification code</p>
+                    <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded overflow-x-auto">{`{
+  "verify_code": "123456"
+}`}</pre>
+                  </div>
+
+                  {/* Disable 2FA */}
+                  <div className="border-l-4 border-red-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-[10px] sm:text-xs font-bold">POST</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/auth/2fa/disable</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Disable 2FA for current user</p>
+                  </div>
+
+                  {/* Admin Disable 2FA */}
+                  <div className="border-l-4 border-orange-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-[10px] sm:text-xs font-bold">POST</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/users/{`{user_id}`}/2fa/disable</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Super Admin or Org Admin: Disable 2FA for any user</p>
+                  </div>
+
+                  {/* 2FA Login */}
+                  <div className="border-l-4 border-purple-500 pl-3 sm:pl-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-[10px] sm:text-xs font-bold">POST</span>
+                      <code className="text-xs sm:text-sm text-gray-900 dark:text-white">/api/auth/login/verify-2fa</code>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Complete login with 2FA code</p>
+                    <pre className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 rounded overflow-x-auto">{`{
+  "username": "admin",
+  "password": "admin123",
+  "totp_code": "123456",
+  "organization_slug": "your-org"  // Optional
+}`}</pre>
                   </div>
                 </div>
               </div>

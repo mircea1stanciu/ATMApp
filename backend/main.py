@@ -678,6 +678,73 @@ async def get_2fa_status(
         "user_id": current_user.id
     }
 
+@app.post("/api/users/{user_id}/2fa/disable", tags=["User Management"])
+async def admin_disable_user_2fa(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Super Admin or Org Admin: Disable 2FA for users"""
+    # Get the target user
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Authorization checks
+    if current_user.role == UserRole.SUPER_ADMIN:
+        # Super admins can disable 2FA for any user
+        pass
+    elif current_user.role == UserRole.ORG_ADMIN:
+        # Org admins can only disable 2FA for users in their organization
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Organization admin must be associated with an organization"
+            )
+        if target_user.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only disable 2FA for users in your organization"
+            )
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="Only super administrators and organization administrators can disable 2FA for other users"
+        )
+    
+    # Don't allow disabling 2FA for yourself through this endpoint
+    if target_user.id == current_user.id:
+        raise HTTPException(
+            status_code=400, 
+            detail="Use the regular 2FA disable endpoint for your own account"
+        )
+    
+    # Check if 2FA is enabled
+    if not target_user.two_fa_enabled:
+        return {
+            "message": "2FA is already disabled for this user",
+            "enabled": False,
+            "user_id": target_user.id,
+            "username": target_user.username
+        }
+    
+    # Disable 2FA
+    target_user.two_fa_enabled = False
+    target_user.two_fa_secret = None
+    db.add(target_user)
+    db.commit()
+    
+    # Log the action
+    admin_type = "Super admin" if current_user.role == UserRole.SUPER_ADMIN else "Org admin"
+    logger.info(f"{admin_type} {current_user.username} disabled 2FA for user {target_user.username} (ID: {target_user.id})")
+    
+    return {
+        "message": f"2FA disabled successfully for user {target_user.username}",
+        "enabled": False,
+        "user_id": target_user.id,
+        "username": target_user.username
+    }
+
 @app.post("/api/auth/register", response_model=TokenResponse, tags=["Authentication"])
 async def register(register_data: RegisterRequest, db: Session = Depends(get_db)):
     """Register new user with organization support"""
@@ -1537,8 +1604,8 @@ async def update_subscription_plan(
     
     # Validate subscription plan
     plan_name = plan_data.get("subscription_plan", "").upper()
-    if plan_name not in ["FREE", "BASIC", "PREMIUM", "ENTERPRISE"]:
-        raise HTTPException(status_code=400, detail="Invalid subscription plan")
+    if plan_name not in ["FREE", "SMALL_BUSINESS", "ENTERPRISE"]:
+        raise HTTPException(status_code=400, detail="Invalid subscription plan. Must be: FREE, SMALL_BUSINESS, or ENTERPRISE")
     
     # Update subscription plan
     old_plan = org.subscription_plan.value
@@ -1547,8 +1614,7 @@ async def update_subscription_plan(
     # Auto-update limits based on plan
     plan_limits = {
         "FREE": {"max_users": 10, "max_chat_sessions": 1000},
-        "BASIC": {"max_users": 20, "max_chat_sessions": 5000},
-        "PREMIUM": {"max_users": 50, "max_chat_sessions": 25000},
+        "SMALL_BUSINESS": {"max_users": 20, "max_chat_sessions": 5000},
         "ENTERPRISE": {"max_users": 100, "max_chat_sessions": 50000}
     }
     
@@ -1627,6 +1693,7 @@ async def list_organization_users(
         "role": user.role.value,
         "assigned_communities": json.loads(user.assigned_communities) if user.assigned_communities else [],
         "is_active": user.is_active,
+        "two_fa_enabled": user.two_fa_enabled,
         "created_at": user.created_at.isoformat(),
         "last_login": user.last_login.isoformat() if user.last_login else None
     } for user in users]
@@ -1998,6 +2065,100 @@ async def get_organization_stats(
             "chats": round((total_chats / org.max_chat_sessions) * 100, 2) if org.max_chat_sessions > 0 else 0
         }
     }
+
+# ==================== FEATURE FLAGS & SUBSCRIPTION APIS ====================
+
+@app.get("/api/features", tags=["Features"])
+async def get_user_features_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all features available to current user based on subscription plan"""
+    from core.feature_gates import get_user_features
+    return get_user_features(current_user, db)
+
+
+@app.get("/api/features/compare", tags=["Features"])
+async def compare_subscription_plans():
+    """Get feature comparison across all subscription plans"""
+    from core.feature_flags import compare_plans
+    return {
+        "plans": ["free", "small_business", "enterprise"],
+        "features": compare_plans()
+    }
+
+
+@app.get("/api/subscription-plans", tags=["Subscriptions"])
+async def get_subscription_plans():
+    """Get all available subscription plans with their limits and features"""
+    from core.feature_flags import PLAN_LIMITS, get_plan_features, FEATURE_DESCRIPTIONS, Feature, compare_plans
+    
+    plans_info = {}
+    for plan_name in ["free", "small_business", "enterprise"]:
+        features = get_plan_features(plan_name)
+        limits = PLAN_LIMITS.get(plan_name, {})
+        
+        plans_info[plan_name] = {
+            "name": plan_name.replace("_", " ").title(),
+            "limits": limits,
+            "features": [
+                {
+                    "id": f.value,
+                    "name": f.value.replace("_", " ").title(),
+                    "description": FEATURE_DESCRIPTIONS.get(f, "")
+                }
+                for f in features
+            ],
+            "feature_count": len(features)
+        }
+    
+    return {
+        "plans": plans_info,
+        "comparison": compare_plans()
+    }
+
+
+@app.post("/api/features/{feature_name}/check", tags=["Features"])
+async def check_feature_access_endpoint(
+    feature_name: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Check if current user has access to a specific feature"""
+    from core.feature_flags import Feature, has_feature
+    
+    # Convert feature_name to Feature enum
+    try:
+        feature = Feature[feature_name.upper()]
+    except KeyError:
+        raise HTTPException(status_code=400, detail=f"Invalid feature name: {feature_name}")
+    
+    if not current_user.organization_id:
+        return {
+            "has_access": False,
+            "reason": "No organization membership"
+        }
+    
+    org = db.query(Organization).filter(
+        Organization.id == current_user.organization_id
+    ).first()
+    
+    if not org:
+        return {
+            "has_access": False,
+            "reason": "Organization not found"
+        }
+    
+    subscription_plan = org.subscription_plan.value
+    has_access = has_feature(subscription_plan, feature)
+    
+    return {
+        "feature": feature_name,
+        "has_access": has_access,
+        "subscription_plan": subscription_plan,
+        "organization": org.name
+    }
+
 
 if __name__ == "__main__":
     import uvicorn

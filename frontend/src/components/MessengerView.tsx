@@ -67,7 +67,7 @@ export default function MessengerView() {
   const [isSearching, setIsSearching] = useState(false);
   const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'conversations' | 'users'>('conversations');
+  const [activeTab, setActiveTab] = useState<'ai' | 'conversations' | 'users'>('ai');
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
   const [groupName, setGroupName] = useState('');
@@ -240,9 +240,41 @@ export default function MessengerView() {
         setSearchQuery('');
         setSearchResults([]);
         setActiveTab('conversations'); // Switch to conversations tab
+      } else {
+        const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        console.error('Error starting conversation:', response.status, error);
+        alert(`Failed to start conversation: ${error.detail || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error starting conversation:', error);
+      alert('Failed to start conversation. Please try again.');
+    }
+  };
+
+  // Delete conversation
+  const deleteConversation = async (conversationId: number) => {
+    if (!confirm('Are you sure you want to delete this conversation?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/messaging/conversations/${conversationId}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+
+      if (response.ok) {
+        // Remove from conversations list
+        setConversations(prev => prev.filter(c => c.id !== conversationId));
+        
+        // Clear selection if this conversation was selected
+        if (selectedConversation?.id === conversationId) {
+          setSelectedConversation(null);
+          setMessages([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
     }
   };
 
@@ -454,10 +486,11 @@ export default function MessengerView() {
   };
 
   // WebSocket connection
-  const connectWebSocket = () => {
-    if (!currentUser) return;
+  const connectWebSocket = (user?: User) => {
+    const userToConnect = user || currentUser;
+    if (!userToConnect) return;
 
-    const ws = new WebSocket(`ws://localhost:8002/api/v1/messaging/ws/${currentUser.id}`);
+    const ws = new WebSocket(`ws://localhost:8002/api/v1/messaging/ws/${userToConnect.id}`);
     
     ws.onopen = () => {
       console.log('WebSocket connected');
@@ -479,6 +512,10 @@ export default function MessengerView() {
       } else if (data.type === 'user_status_changed') {
         // Refresh organization users when someone's status changes
         loadOrganizationUsers();
+      } else if (data.type === 'conversation_created') {
+        // Reload conversations list when a new conversation is created
+        console.log('New conversation created:', data.conversation_id);
+        loadConversations();
       }
     };
 
@@ -530,7 +567,7 @@ export default function MessengerView() {
       if (user) {
         await loadConversations();
         await loadOrganizationUsers();
-        connectWebSocket();
+        connectWebSocket(user);  // Pass user directly!
       }
       setLoading(false);
     };
@@ -625,6 +662,16 @@ export default function MessengerView() {
         {!searchQuery && (
           <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
             <div className="flex">
+              <button
+                onClick={() => setActiveTab('ai')}
+                className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                  activeTab === 'ai'
+                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-gray-700'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                🤖 AI Assistant
+              </button>
               <button
                 onClick={() => setActiveTab('conversations')}
                 className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
@@ -721,52 +768,68 @@ export default function MessengerView() {
                   const memberCount = conversation.participants?.length || 0;
                   
                   return (
-                    <button
+                    <div
                       key={conversation.id}
-                      onClick={() => setSelectedConversation(conversation)}
-                      className={`w-full px-2 py-1.5 border-b border-gray-100 dark:border-gray-700 text-left transition-colors ${
+                      className={`w-full px-2 py-1.5 border-b border-gray-100 dark:border-gray-700 transition-colors group ${
                         selectedConversation?.id === conversation.id
                           ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
                           : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
-                          conversation.is_group 
-                            ? 'bg-gradient-to-br from-purple-500 to-pink-600' 
-                            : 'bg-gray-500'
-                        }`}>
-                          {conversation.is_group ? '👥' : displayName.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1">
-                            <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">
-                              {displayName}
-                              {conversation.is_group && (
-                                <span className="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
-                                  ({memberCount})
-                                </span>
+                        <button
+                          onClick={() => setSelectedConversation(conversation)}
+                          className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
+                        >
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
+                            conversation.is_group 
+                              ? 'bg-gradient-to-br from-purple-500 to-pink-600' 
+                              : 'bg-gray-500'
+                          }`}>
+                            {conversation.is_group ? '👥' : displayName.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                                {displayName}
+                                {conversation.is_group && (
+                                  <span className="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
+                                    ({memberCount})
+                                  </span>
+                                )}
+                              </div>
+                              {conversation.last_message && (
+                                <div className="text-[9px] text-gray-500 dark:text-gray-400 flex-shrink-0">
+                                  {formatTimestamp(conversation.last_message.timestamp)}
+                                </div>
                               )}
                             </div>
                             {conversation.last_message && (
-                              <div className="text-[9px] text-gray-500 dark:text-gray-400 flex-shrink-0">
-                                {formatTimestamp(conversation.last_message.timestamp)}
+                              <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                                {conversation.last_message.content}
+                              </div>
+                            )}
+                            {conversation.unread_count && conversation.unread_count > 0 && (
+                              <div className="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
+                                {conversation.unread_count}
                               </div>
                             )}
                           </div>
-                          {conversation.last_message && (
-                            <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
-                              {conversation.last_message.content}
-                            </div>
-                          )}
-                          {conversation.unread_count && conversation.unread_count > 0 && (
-                            <div className="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
-                              {conversation.unread_count}
-                            </div>
-                          )}
-                        </div>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteConversation(conversation.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 dark:hover:bg-red-900/20 rounded"
+                          title="Delete conversation"
+                        >
+                          <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
-                    </button>
+                    </div>
                   );
                 })
               ) : (
@@ -804,7 +867,7 @@ export default function MessengerView() {
                           <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">
                             {user.full_name}
                           </div>
-                          <div className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                          <div className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
                             user.is_online 
                               ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' 
                               : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'

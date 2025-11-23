@@ -656,9 +656,9 @@ export default function CommunityPage() {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 flex overflow-auto relative">
-          {/* Main Content Area - Resizable */}
-          <div className="flex-1 min-w-0 overflow-auto">
+        <div className="flex-1 overflow-auto relative">
+          {/* Main Content Area */}
+          <div className="h-full overflow-auto">
             {activeView === 'dashboard' && (
               <CommunityDashboard
                 communityId={communityId}
@@ -675,16 +675,16 @@ export default function CommunityPage() {
               />
             )}
           </div>
-
-          {/* Resizable Chat Panel - Only visible when chat is open */}
-          {isChatOpen && (
-            <ResizableChatPanel 
-              defaultWidth={420}
-              minWidth={300}
-              maxWidth={800}
-            />
-          )}
         </div>
+
+        {/* Chat Overlay - Only visible when chat is open */}
+        {isChatOpen && (
+          <ResizableChatPanel 
+            defaultWidth={600}
+            minWidth={400}
+            maxWidth={900}
+          />
+        )}
 
         {/* Floating Chat Button - Only visible when chat is closed */}
         {!isChatOpen && (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import MessengerView from './MessengerView'
+import { useChat } from '../contexts/ChatContext'
 
 interface ResizableChatPanelProps {
   defaultWidth?: number
@@ -10,115 +11,72 @@ interface ResizableChatPanelProps {
 }
 
 export default function ResizableChatPanel({
-  defaultWidth = 420,
-  minWidth = 300,
-  maxWidth = 800
+  defaultWidth = 900,
+  minWidth = 600,
+  maxWidth = 1200
 }: ResizableChatPanelProps) {
+  const { closeChat } = useChat()
   const [width, setWidth] = useState(defaultWidth)
+  const [height, setHeight] = useState(800)
   const [isResizing, setIsResizing] = useState(false)
-  const [isDraggingRight, setIsDraggingRight] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
-  const resizeHandleRef = useRef<HTMLDivElement>(null)
 
-  // Load saved width from localStorage
+  // Load saved dimensions from localStorage
   useEffect(() => {
-    const savedWidth = localStorage.getItem('chatPanelWidth')
+    const savedWidth = localStorage.getItem('chatOverlayWidth')
+    const savedHeight = localStorage.getItem('chatOverlayHeight')
     if (savedWidth) {
       const parsedWidth = parseInt(savedWidth, 10)
       if (parsedWidth >= minWidth && parsedWidth <= maxWidth) {
         setWidth(parsedWidth)
       }
     }
+    if (savedHeight) {
+      const parsedHeight = parseInt(savedHeight, 10)
+      if (parsedHeight >= 600 && parsedHeight <= 1000) {
+        setHeight(parsedHeight)
+      }
+    }
   }, [minWidth, maxWidth])
 
-  // Handle mouse move during resize
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing && !isDraggingRight) return
-
-    if (isDraggingRight) {
-      // Dragging right handle (right side of screen) - expands panel
-      const newWidth = width + e.movementX
-      if (newWidth >= minWidth && newWidth <= maxWidth) {
-        setWidth(newWidth)
-      }
-    } else {
-      // Dragging left handle (left side of screen) - compacts dashboard, expands panel
-      const newWidth = width - e.movementX
-      if (newWidth >= minWidth && newWidth <= maxWidth) {
-        setWidth(newWidth)
-      }
-    }
-  }, [isResizing, isDraggingRight, width, minWidth, maxWidth])
-
-  // Handle mouse up
-  const handleMouseUp = useCallback(() => {
-    if (isResizing || isDraggingRight) {
-      setIsResizing(false)
-      setIsDraggingRight(false)
-      // Save width to localStorage
-      localStorage.setItem('chatPanelWidth', width.toString())
-    }
-  }, [isResizing, isDraggingRight, width])
-
-  // Add event listeners
-  useEffect(() => {
-    if (isResizing || isDraggingRight) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
-        document.body.style.cursor = 'default'
-        document.body.style.userSelect = 'auto'
-      }
-    }
-  }, [isResizing, isDraggingRight, handleMouseMove, handleMouseUp])
-
-  const handleLeftHandleMouseDown = () => {
-    setIsResizing(true)
-  }
-
-  const handleRightHandleMouseDown = () => {
-    setIsDraggingRight(true)
-  }
-
   return (
-    <div
-      ref={panelRef}
-      className="relative flex flex-col bg-gray-800 border-l border-gray-700 h-full group shrink-0"
-      style={{ width: `${width}px`, minWidth: `${minWidth}px` }}
-    >
-      {/* Left Resize Handle - Compress dashboard, expand panel */}
-      <div
-        ref={resizeHandleRef}
-        onMouseDown={handleLeftHandleMouseDown}
-        className="absolute left-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-500 dark:hover:bg-blue-400 hover:w-1.5 hover:shadow-lg transition-all opacity-0 group-hover:opacity-100 bg-gray-300 dark:bg-gray-600 z-50"
-        title="Drag left to expand messenger"
+    <>
+      {/* Backdrop Blur */}
+      <div 
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity duration-300"
+        onClick={closeChat}
       />
 
-      {/* Right Resize Handle - Compact panel, expand dashboard */}
+      {/* Chat Overlay */}
       <div
-        onMouseDown={handleRightHandleMouseDown}
-        className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-500 dark:hover:bg-blue-400 hover:w-1.5 hover:shadow-lg transition-all opacity-0 group-hover:opacity-100 bg-gray-300 dark:bg-gray-600 z-50"
-        title="Drag right to expand dashboard"
-      />
-
-      {/* Width Indicator - Shows during resize */}
-      {(isResizing || isDraggingRight) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-blue-500/5 pointer-events-none z-40">
-          <div className="bg-blue-600 dark:bg-blue-500 text-white px-3 py-1 rounded text-sm font-medium shadow-lg">
-            {width}px
-          </div>
+        ref={panelRef}
+        className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden"
+        style={{ 
+          width: `${width}px`, 
+          height: `${height}px`,
+          maxWidth: '90vw',
+          maxHeight: '90vh'
+        }}
+      >
+        {/* Header with Close Button */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">💬 Team Messenger</h2>
+          <button
+            onClick={closeChat}
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            title="Close"
+          >
+            <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-      )}
 
-      {/* Chat Panel Content - MessengerView */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <MessengerView />
+        {/* Chat Panel Content - MessengerView */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <MessengerView />
+        </div>
       </div>
-    </div>
+    </>
   )
 }

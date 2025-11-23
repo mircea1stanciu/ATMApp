@@ -296,9 +296,15 @@ export default function PersistentChatSidebar() {
 
   return (
     <>
-      {/* Chat Sidebar */}
-      <div className={`fixed top-0 right-0 h-full bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-xl z-40 transition-all duration-300 ${
-        isCollapsed ? 'w-12' : 'w-96'
+      {/* Backdrop Blur */}
+      <div 
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity duration-300"
+        onClick={closeChat}
+      />
+
+      {/* Chat Overlay */}
+      <div className={`fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl z-50 transition-all duration-300 ${
+        isCollapsed ? 'w-16 h-16' : 'w-[900px] h-[800px]'
       }`}>
         
         {/* Collapsed State */}

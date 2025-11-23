@@ -31,13 +31,8 @@ export default function ChatAwareLayout({ children }: ChatAwareLayoutProps) {
     return () => window.removeEventListener('chatCollapseChanged' as any, handleCollapseChange);
   }, []);
   
-  const getRightMargin = () => {
-    if (!isOpen) return 'mr-0';
-    return isCollapsed ? 'mr-12' : 'mr-96';
-  };
-  
   return (
-    <div className={`min-h-screen transition-all duration-300 ${getRightMargin()}`}>
+    <div className="min-h-screen">
       {children}
     </div>
   );
