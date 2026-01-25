@@ -1,0 +1,94 @@
+{
+  "validAdminRegistration": {
+    "access_token": "test-access-token-12345",
+    "username": "testadmin",
+    "email": "admin@testorg.com",
+    "full_name": "Test Admin",
+    "password": "SecurePass123!",
+    "confirm_password": "SecurePass123!"
+  },
+  "validUserRegistration": {
+    "organization_slug": "test-org",
+    "username": "testuser",
+    "email": "user@testorg.com",
+    "full_name": "Test User",
+    "password": "SecurePass123!",
+    "confirm_password": "SecurePass123!"
+  },
+  "validationTests": {
+    "invalidEmail": "invalid-email-format",
+    "weakPassword": "123",
+    "emptyAccessToken": "",
+    "invalidSlug": "Invalid Slug!"
+  },
+  "duplicateUserTest": {
+    "first": {
+      "access_token": "test-token-duplicate",
+      "username": "duplicateuser",
+      "email": "duplicate@example.com",
+      "full_name": "Duplicate User",
+      "password": "SecurePass123!",
+      "confirm_password": "SecurePass123!"
+    },
+    "second": {
+      "access_token": "test-token-duplicate",
+      "username": "duplicateuser",
+      "email": "duplicate2@example.com",
+      "full_name": "Second Duplicate",
+      "password": "SecurePass123!",
+      "confirm_password": "SecurePass123!"
+    }
+  },
+  "errorMessages": {
+    "required": ["required", "cannot be empty", "this field is required"],
+    "invalidEmail": ["invalid email", "valid email", "email format"],
+    "weakPassword": ["password.*weak", "password.*short", "at least.*characters", "minimum.*characters"],
+    "invalidSlug": ["slug.*invalid", "lowercase", "alphanumeric", "only letters", "numbers and hyphens"],
+    "duplicateUsername": ["already exists", "already taken", "username.*use", "already in use"],
+    "passwordMismatch": ["do not match", "passwords.*match", "must match"]
+  },
+  "successMessages": {
+    "registration": ["success", "created", "registered", "welcome"],
+    "login": ["success", "registered", "check.*email", "account created"]
+  },
+  "routes": {
+    "register": "/register",
+    "login": "/login",
+    "dashboard": "/dashboard",
+    "adminDashboard": "/admin"
+  },
+  "api": {
+    "adminRegister": "/api/auth/register-org-admin",
+    "userRegister": "/api/auth/register-user",
+    "login": "/api/login",
+    "users": "/api/users"
+  },
+  "formFields": {
+    "adminRegistration": {
+      "access_token": "access_token",
+      "username": "username",
+      "email": "email",
+      "full_name": "full_name",
+      "password": "password",
+      "confirm_password": "confirm_password"
+    },
+    "userRegistration": {
+      "organization_slug": "organization_slug",
+      "username": "username",
+      "email": "email",
+      "full_name": "full_name",
+      "password": "password",
+      "confirm_password": "confirm_password"
+    },
+    "login": {
+      "username": "username",
+      "password": "password"
+    }
+  },
+  "timeouts": {
+    "standard": 5000,
+    "api": 10000,
+    "navigation": 10000,
+    "accountCreation": 2000
+  }
+}

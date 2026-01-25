@@ -6,6 +6,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
 import { MessageSquare, Clock, TrendingUp, Users } from 'lucide-react';
+import OfficeManagement from '@/components/OfficeManagement';
 
 interface User {
   id: number;
@@ -136,6 +137,16 @@ export default function UserDashboard() {
             <p className="text-gray-600 dark:text-gray-400 text-[10px] sm:text-xs md:text-sm">Plan</p>
           </div>
         </div>
+
+        {/* Office Management Widget */}
+        {user.organization && (
+          <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4 md:mb-6">
+              Office Management
+            </h2>
+            <OfficeManagement userRole={user.role} />
+          </div>
+        )}
 
         {/* Communities Grid - Only show if user is admin or has assigned communities */}
         {(user.role === 'org_admin' || user.role === 'super_admin' || (user.assigned_communities && user.assigned_communities.length > 0)) && (

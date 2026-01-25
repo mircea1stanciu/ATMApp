@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sun, Moon } from 'lucide-react';
+import OfficeManagement from './OfficeManagement';
 
 const API_HOST = process.env.NEXT_PUBLIC_API_HOST || 'localhost';
 const API_PORT = process.env.NEXT_PUBLIC_API_PORT || '8002';
@@ -918,55 +919,56 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex">
       {/* Sidebar */}
-      <div className="w-64 bg-gray-900 text-white flex flex-col">
-        <div className="p-6 border-b border-gray-700">
-          <h2 className="text-xl font-bold">🤖 UnifiedWork</h2>
-          <p className="text-sm text-gray-400 mt-1">Admin Dashboard</p>
+      <div className="w-40 bg-gray-900 text-white flex flex-col">
+        <div className="p-4 border-b border-gray-700">
+          <h2 className="text-sm font-bold">🤖 UnifiedWork</h2>
+          <p className="text-[9px] text-gray-400 mt-0.5">Admin Dashboard</p>
         </div>
 
-        <nav className="flex-1 py-4">
+        <nav className="flex-1 py-2">
           {[
             { id: 'overview', icon: '📊', label: 'Overview', roles: ['super_admin', 'org_admin'] },
             { id: 'organizations', icon: '🏢', label: 'Organizations', roles: ['super_admin'] },
             { id: 'users', icon: '👥', label: 'Users', roles: ['super_admin', 'org_admin'] },
+            { id: 'office', icon: '🏢', label: 'Office Management', roles: ['org_admin'] },
             { id: 'api-docs', icon: '📚', label: 'API Documentation', roles: ['super_admin'] },
             { id: 'api-docs-todo', icon: '✅', label: 'To Do List', roles: ['super_admin', 'org_admin'] }
           ].filter(item => item.roles.includes(currentUser?.role || '')).map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveSection(item.id)}
-              className={`w-full flex items-center gap-3 px-6 py-3 text-left transition-colors ${
+              className={`w-full flex items-center gap-2 px-4 py-2 text-left transition-colors ${
                 activeSection === item.id 
                   ? 'bg-blue-600 border-r-3 border-white' 
                   : 'hover:bg-gray-800'
               }`}
             >
-              <span className="text-lg">{item.icon}</span>
-              <span>{item.label}</span>
+              <span className="text-sm">{item.icon}</span>
+              <span className="text-[10px]">{item.label}</span>
             </button>
           ))}
           
-          <div className="mt-8 px-6 space-y-2">
+          <div className="mt-5 px-4 space-y-1">
             <button
               onClick={() => router.push('/')}
-              className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
+              className="w-full flex items-center gap-2 px-2 py-1 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
             >
-              <span className="text-lg">🏠</span>
-              <span>Home</span>
+              <span className="text-sm">🏠</span>
+              <span className="text-[10px]">Home</span>
             </button>
             <button
               onClick={() => router.push('/settings')}
-              className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
+              className="w-full flex items-center gap-2 px-2 py-1 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
             >
-              <span className="text-lg">⚙️</span>
-              <span>Settings</span>
+              <span className="text-sm">⚙️</span>
+              <span className="text-[10px]">Settings</span>
             </button>
             <button
               onClick={logout}
-              className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
+              className="w-full flex items-center gap-2 px-2 py-1 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
             >
-              <span className="text-lg">🚪</span>
-              <span>Logout</span>
+              <span className="text-sm">🚪</span>
+              <span className="text-[10px]">Logout</span>
             </button>
           </div>
         </nav>
@@ -982,6 +984,7 @@ export default function AdminDashboard() {
                 {activeSection === 'overview' && 'Dashboard Overview'}
                 {activeSection === 'organizations' && 'Organizations Management'}
                 {activeSection === 'users' && (currentUser?.role === 'org_admin' ? 'Organization Users' : 'Users Management')}
+                {activeSection === 'office' && 'Office Management'}
                 {activeSection === 'api-docs' && 'API Documentation'}
                 {activeSection === 'api-docs-todo' && (currentUser?.role === 'org_admin' ? 'My To Do List' : 'API Documentation To Do List')}
               </h1>
@@ -1034,7 +1037,7 @@ export default function AdminDashboard() {
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-3 sm:p-4 md:p-5 overflow-y-auto max-w-7xl mx-auto w-full">
+        <main className="flex-1 p-1 sm:p-2 md:p-3 overflow-y-auto w-full">
           {/* Overview Section */}
           {activeSection === 'overview' && (
             <div className="space-y-4 sm:space-y-6">
@@ -1482,6 +1485,11 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Office Management Section */}
+          {activeSection === 'office' && (
+            <OfficeManagement userRole={currentUser?.role || ''} />
           )}
 
           {/* API Documentation Section */}

@@ -54,7 +54,12 @@ from agents.simple_design_agent import SimpleDesignAgent
 from agents.simple_product_agent import SimpleProductAgent
 from agents.simple_devops_agent import SimpleDevOpsAgent
 from agents.simple_analyst_agent import SimpleAnalystAgent
-from api import project_routes
+from api import project_routes, office_routes
+
+# Import office models to register them with SQLAlchemy
+from models.office_models import (
+    OfficeDesk, ParkingSpace, DeskBooking, ParkingBooking, OfficeSettings
+)
 
 # Load environment variables
 load_dotenv()
@@ -161,6 +166,7 @@ async def add_security_headers(request: Request, call_next):
 
 # Include routers
 app.include_router(project_routes.router)
+app.include_router(office_routes.router)
 
 # Import and include messaging routes
 from messaging_routes import router as messaging_router

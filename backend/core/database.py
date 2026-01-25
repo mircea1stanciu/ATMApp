@@ -12,7 +12,10 @@ from sqlalchemy.orm import sessionmaker, Session, relationship
 from passlib.context import CryptContext
 
 # Database setup
-SQLALCHEMY_DATABASE_URL = "sqlite:///./unifiedwork.db"
+import os
+_current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Get parent directory (project root)
+_db_path = os.path.join(_current_dir, "unifiedwork.db")
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{_db_path}"
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
@@ -358,6 +361,14 @@ def get_db():
 
 def init_db():
     """Initialize database and create default data"""
+    # Import office models here to avoid circular imports
+    # This registers them with SQLAlchemy's metadata before creating tables
+    try:
+        from models.office_models import OfficeDesk, ParkingSpace, DeskBooking, ParkingBooking, OfficeSettings
+    except ImportError:
+        # Models may not exist yet during initial setup
+        pass
+    
     Base.metadata.create_all(bind=engine)
     
     db = SessionLocal()
