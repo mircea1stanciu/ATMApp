@@ -41,11 +41,22 @@ export default function ModelSelector({ onModelSelect, currentModel }: ModelSele
         }
       });
       const data = await response.json();
-      setModels(data.models);
-      setSubscription(data.subscription);
-      setSelectedModel(data.user_preference);
+      
+      // Ensure models is always an array
+      if (data && Array.isArray(data.models)) {
+        setModels(data.models);
+      } else {
+        console.warn('Invalid models data received:', data);
+        setModels([]); // Fallback to empty array
+      }
+      
+      setSubscription(data?.subscription || 'free');
+      setSelectedModel(data?.user_preference || 'gpt-4o-mini');
     } catch (error) {
       console.error('Failed to load models:', error);
+      // Set default empty state on error
+      setModels([]);
+      setSubscription('free');
     } finally {
       setLoading(false);
     }
@@ -199,74 +210,81 @@ export default function ModelSelector({ onModelSelect, currentModel }: ModelSele
 
       {/* Model Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {models.map((model) => (
-          <button
-            key={model.id}
-            onClick={() => setSelectedModel(model.id)}
-            className={`relative p-4 rounded-lg border-2 text-left transition-all ${
-              selectedModel === model.id
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 bg-white dark:bg-gray-800'
-            }`}
-          >
-            {/* Selected Check */}
-            {selectedModel === model.id && (
-              <div className="absolute top-2 right-2">
-                <Check className="w-5 h-5 text-blue-500" />
-              </div>
-            )}
+        {models && models.length > 0 ? (
+          models.map((model) => (
+            <button
+              key={model.id}
+              onClick={() => setSelectedModel(model.id)}
+              className={`relative p-4 rounded-lg border-2 text-left transition-all ${
+                selectedModel === model.id
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 bg-white dark:bg-gray-800'
+              }`}
+            >
+              {/* Selected Check */}
+              {selectedModel === model.id && (
+                <div className="absolute top-2 right-2">
+                  <Check className="w-5 h-5 text-blue-500" />
+                </div>
+              )}
 
-            {/* Model Name & Provider */}
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex-1">
-                <h4 className="font-semibold text-gray-900 dark:text-white">
-                  {model.name}
-                </h4>
-                <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium ${getProviderColor(model.provider)}`}>
-                  {model.provider}
-                </span>
-              </div>
-            </div>
-
-            {/* Description */}
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-              {model.description}
-            </p>
-
-            {/* Attributes */}
-            <div className="flex flex-wrap items-center gap-3 text-xs">
-              {/* Speed */}
-              <div className="flex items-center gap-1">
-                {getSpeedIcon(model.speed)}
-                <span className="text-gray-600 dark:text-gray-400 capitalize">{model.speed}</span>
-              </div>
-
-              {/* Cost */}
-              {showDetails && (
-                <div className="flex items-center gap-1">
-                  <DollarSign className="w-4 h-4 text-yellow-500" />
-                  <span className="text-gray-600 dark:text-gray-400">
-                    ${model.cost.toFixed(4)}/1K
+              {/* Model Name & Provider */}
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex-1">
+                  <h4 className="font-semibold text-gray-900 dark:text-white">
+                    {model.name}
+                  </h4>
+                  <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium ${getProviderColor(model.provider)}`}>
+                    {model.provider}
                   </span>
                 </div>
-              )}
+              </div>
 
-              {/* Capabilities */}
-              {showDetails && (
-                <div className="flex flex-wrap gap-1 mt-2 w-full">
-                  {model.capabilities.map((cap) => (
-                    <span
-                      key={cap}
-                      className="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                    >
-                      {cap}
-                    </span>
-                  ))}
+              {/* Description */}
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                {model.description}
+              </p>
+
+              {/* Attributes */}
+              <div className="flex flex-wrap items-center gap-3 text-xs">
+                {/* Speed */}
+                <div className="flex items-center gap-1">
+                  {getSpeedIcon(model.speed)}
+                  <span className="text-gray-600 dark:text-gray-400 capitalize">{model.speed}</span>
                 </div>
-              )}
-            </div>
-          </button>
-        ))}
+
+                {/* Cost */}
+                {showDetails && (
+                  <div className="flex items-center gap-1">
+                    <DollarSign className="w-4 h-4 text-yellow-500" />
+                    <span className="text-gray-600 dark:text-gray-400">
+                      ${model.cost.toFixed(4)}/1K
+                    </span>
+                  </div>
+                )}
+
+                {/* Capabilities */}
+                {showDetails && (
+                  <div className="flex flex-wrap gap-1 mt-2 w-full">
+                    {model.capabilities.map((cap) => (
+                      <span
+                        key={cap}
+                        className="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                      >
+                        {cap}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </button>
+          ))
+        ) : (
+          <div className="col-span-2 text-center py-8 text-gray-500 dark:text-gray-400">
+            <Info className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p className="text-sm">No AI models available. Please check your connection or try refreshing.</p>
+          </div>
+        )}
       </div>
 
       {/* Temperature Control - Enhanced */}

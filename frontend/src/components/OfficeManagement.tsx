@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Calendar, MapPin, Monitor, Zap, Plus, X, Check, Building2, Users, Trash2, Layout, Video, Presentation } from 'lucide-react';
-import FloorPlanEditorV2 from './FloorPlanEditorV2';
+import FloorPlanEditor from './FloorPlanEditor';
 
 const API_HOST = process.env.NEXT_PUBLIC_API_HOST || 'localhost';
 const API_PORT = process.env.NEXT_PUBLIC_API_PORT || '8002';
@@ -632,7 +632,7 @@ export default function OfficeManagement({ userRole }: { userRole: string }) {
         {/* Floor Plan Tab */}
         {activeTab === 'floor-plan' && (
           <div>
-            <FloorPlanEditorV2 />
+            <FloorPlanEditor />
           </div>
         )}
 

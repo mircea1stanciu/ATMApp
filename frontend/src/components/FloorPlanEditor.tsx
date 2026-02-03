@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { 
   Plus, ZoomIn, ZoomOut, Save, Trash2, Video, Building2, 
   DoorOpen, Navigation, Grid3x3, Maximize2, Users, Monitor, RotateCw, RotateCcw,
-  Download, Upload, Layers
+  Download, Upload, Layers, Lock, Unlock
 } from 'lucide-react';
 
 const API_HOST = process.env.NEXT_PUBLIC_API_HOST || 'localhost';
@@ -38,6 +38,7 @@ interface RegionConfig {
   hasEntrance: boolean; // Legacy - kept for compatibility
   width: number; // Region width in pixels
   height: number; // Region height in pixels
+  position?: { x: number; y: number }; // Optional position offset for dragging
 }
 
 interface PlaceableItem {
@@ -87,6 +88,24 @@ interface ElevatorZoneConfig {
   entrances: RegionEntrance[]; // Multiple configurable entrances
 }
 
+type DrawingElementType = 'technical-room' | 'wall' | 'toilet' | 'emergency-exit' | 'balcony';
+
+interface DrawingElement {
+  id: string;
+  type: DrawingElementType;
+  position: { row: number; col: number }; // Position in grid
+  width: number; // Width in grid cells
+  height: number; // Height in grid cells
+  rotation: 0 | 90 | 180 | 270; // Rotation in degrees
+  label?: string; // Optional label for the element
+  // Wall specific
+  orientation?: 'horizontal' | 'vertical';
+  // Technical room specific
+  roomType?: 'electrical' | 'mechanical' | 'server' | 'storage' | 'janitor';
+  // Toilet specific
+  toiletType?: 'men' | 'women' | 'accessible' | 'unisex';
+}
+
 interface FloorPlan {
   building: string;
   floor: string;
@@ -95,11 +114,20 @@ interface FloorPlan {
   elevators: Elevator[];
   staircases: Staircase[]; // Added stairs
   elevatorZone: ElevatorZoneConfig;
+  drawings: DrawingElement[]; // New drawing elements
+  // Canvas view settings
+  viewSettings?: {
+    zoom: number;
+    rotation: number;
+    pan: Position;
+    canvasSize: { width: number; height: number };
+    isLocked: boolean; // Save lock state with view settings
+  };
 }
 
 // ==================== Main Component ====================
 
-export default function FloorPlanEditorV2() {
+export default function FloorPlanEditor() {
   const [floorPlan, setFloorPlan] = useState<FloorPlan>({
     building: 'Main Building',
     floor: '1',
@@ -129,7 +157,8 @@ export default function FloorPlanEditorV2() {
         // South side entrance to south-east region
         { id: '4', side: 'south', position: 0.75, width: 2, targetRegion: 'south-east', hasHallway: false },
       ]
-    }
+    },
+    drawings: []
   });
 
   const [islands, setIslands] = useState<any[]>([]);
@@ -138,11 +167,15 @@ export default function FloorPlanEditorV2() {
   const [selectedElevatorId, setSelectedElevatorId] = useState<string | null>(null);
   const [selectedStaircaseId, setSelectedStaircaseId] = useState<string | null>(null);
   const [selectedEntranceId, setSelectedEntranceId] = useState<string | null>(null);
+  const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
   const [draggedItem, setDraggedItem] = useState<PlaceableItem | null>(null);
+  const [draggedDrawing, setDraggedDrawing] = useState<DrawingElement | null>(null);
+  const [draggedRegion, setDraggedRegion] = useState<Region | null>(null); // Track dragged region
   const [dragOffset, setDragOffset] = useState<Position>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [isPanning, setIsPanning] = useState(false); // Track canvas panning state
   const [panStart, setPanStart] = useState<Position>({ x: 0, y: 0 }); // Starting position for pan
+  const [isCanvasLocked, setIsCanvasLocked] = useState(false); // Lock/unlock canvas panning
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0); // Rotation in degrees (0, 90, 180, 270)
   const [pan, setPan] = useState<Position>({ x: 0, y: 0 }); // Centered by default at (0, 0) with the transform
@@ -156,9 +189,10 @@ export default function FloorPlanEditorV2() {
   const [showFloorManager, setShowFloorManager] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [newFloorNumber, setNewFloorNumber] = useState('');
+  const [syncRegionsAcrossFloors, setSyncRegionsAcrossFloors] = useState(false);
   
   // Sidebar tabs
-  const [activeTab, setActiveTab] = useState<'general' | 'elevators' | 'staircases' | 'zone'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'elevators' | 'staircases' | 'zone' | 'drawings'>('general');
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragPosRef = useRef<Position | null>(null);
@@ -219,18 +253,100 @@ export default function FloorPlanEditorV2() {
     loadSavedFloors();
   }, []);
 
+  // Save sync preference when it changes
+  useEffect(() => {
+    localStorage.setItem('syncRegionsAcrossFloors', syncRegionsAcrossFloors.toString());
+    
+    // If sync is being enabled, immediately sync current config to all floors
+    if (syncRegionsAcrossFloors && availableFloors.length > 1) {
+      syncFloorConfigToAllFloors(floorPlan);
+    }
+  }, [syncRegionsAcrossFloors]);
+
+  // Save canvas view settings (pan, zoom, rotation, canvasSize, lock) when they change
+  // Using debounce to avoid excessive saves during dragging
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      try {
+        const floorPlanWithView = {
+          ...floorPlan,
+          viewSettings: {
+            zoom,
+            rotation,
+            pan,
+            canvasSize,
+            isLocked: isCanvasLocked
+          }
+        };
+        
+        const updatedFloors = new Map(savedFloors);
+        updatedFloors.set(floorPlan.floor, floorPlanWithView);
+        
+        // Convert Map to object for localStorage
+        const floorsObject = Object.fromEntries(updatedFloors);
+        localStorage.setItem('floorPlans', JSON.stringify(floorsObject));
+        
+        // Also save global lock preference
+        localStorage.setItem('isCanvasLocked', isCanvasLocked.toString());
+        
+        // Update savedFloors state
+        setSavedFloors(updatedFloors);
+      } catch (error) {
+        console.error('Error saving view settings to floor plan:', error);
+      }
+    }, 300); // Debounce 300ms to avoid too frequent saves during pan dragging
+    
+    return () => clearTimeout(timeoutId);
+  }, [pan, zoom, rotation, canvasSize, isCanvasLocked, floorPlan.floor]);
+
   const loadSavedFloors = () => {
     try {
       const saved = localStorage.getItem('floorPlans');
+      let hasLoadedViewSettings = false;
+      
       if (saved) {
         const parsed = JSON.parse(saved);
-        const floorsMap = new Map<string, FloorPlan>(Object.entries(parsed));
+        const floorsMap = new Map<string, FloorPlan>(Object.entries(parsed).map(([key, value]: [string, any]) => {
+          // Ensure drawings array exists for backward compatibility
+          return [key, {
+            ...value,
+            drawings: value.drawings || []
+          }];
+        }));
         setSavedFloors(floorsMap);
         setAvailableFloors(Array.from(floorsMap.keys()).sort((a, b) => parseInt(a) - parseInt(b)));
         
         // Load the current floor if it exists
         if (floorsMap.has(floorPlan.floor)) {
-          setFloorPlan(floorsMap.get(floorPlan.floor)!);
+          const loadedFloor = floorsMap.get(floorPlan.floor)!;
+          setFloorPlan({
+            ...loadedFloor,
+            drawings: loadedFloor.drawings || []
+          });
+          
+          // Restore view settings if they exist
+          if (loadedFloor.viewSettings) {
+            setZoom(loadedFloor.viewSettings.zoom);
+            setRotation(loadedFloor.viewSettings.rotation);
+            setPan(loadedFloor.viewSettings.pan);
+            setCanvasSize(loadedFloor.viewSettings.canvasSize);
+            setIsCanvasLocked(loadedFloor.viewSettings.isLocked ?? false);
+            hasLoadedViewSettings = true;
+          }
+        }
+      }
+      
+      // Load sync preference
+      const syncPref = localStorage.getItem('syncRegionsAcrossFloors');
+      if (syncPref !== null) {
+        setSyncRegionsAcrossFloors(syncPref === 'true');
+      }
+      
+      // Load canvas lock preference (fallback if not loaded from viewSettings)
+      if (!hasLoadedViewSettings) {
+        const lockPref = localStorage.getItem('isCanvasLocked');
+        if (lockPref !== null) {
+          setIsCanvasLocked(lockPref === 'true');
         }
       }
     } catch (error) {
@@ -241,8 +357,20 @@ export default function FloorPlanEditorV2() {
   // Save current floor plan to localStorage
   const saveCurrentFloor = () => {
     try {
+      // Save floor plan with current view settings including lock state
+      const floorPlanWithView = {
+        ...floorPlan,
+        viewSettings: {
+          zoom,
+          rotation,
+          pan,
+          canvasSize,
+          isLocked: isCanvasLocked
+        }
+      };
+      
       const updatedFloors = new Map(savedFloors);
-      updatedFloors.set(floorPlan.floor, floorPlan);
+      updatedFloors.set(floorPlan.floor, floorPlanWithView);
       setSavedFloors(updatedFloors);
       
       // Convert Map to object for localStorage
@@ -262,25 +390,63 @@ export default function FloorPlanEditorV2() {
 
   // Switch to a different floor
   const switchToFloor = (floorNumber: string) => {
-    // Save current floor before switching
+    // Save current floor before switching (with view settings including lock state)
+    const floorPlanWithView = {
+      ...floorPlan,
+      viewSettings: {
+        zoom,
+        rotation,
+        pan,
+        canvasSize,
+        isLocked: isCanvasLocked
+      }
+    };
+    
     const updatedFloors = new Map(savedFloors);
-    updatedFloors.set(floorPlan.floor, floorPlan);
+    updatedFloors.set(floorPlan.floor, floorPlanWithView);
     setSavedFloors(updatedFloors);
+    
+    // Save to localStorage immediately
+    const floorsObject = Object.fromEntries(updatedFloors);
+    localStorage.setItem('floorPlans', JSON.stringify(floorsObject));
     
     // Load the new floor or create a default one
     if (updatedFloors.has(floorNumber)) {
-      setFloorPlan(updatedFloors.get(floorNumber)!);
+      const loadedFloor = updatedFloors.get(floorNumber)!;
+      setFloorPlan({
+        ...loadedFloor,
+        drawings: loadedFloor.drawings || []
+      });
+      
+      // Restore view settings if they exist
+      if (loadedFloor.viewSettings) {
+        setZoom(loadedFloor.viewSettings.zoom);
+        setRotation(loadedFloor.viewSettings.rotation);
+        setPan(loadedFloor.viewSettings.pan);
+        setCanvasSize(loadedFloor.viewSettings.canvasSize);
+        setIsCanvasLocked(loadedFloor.viewSettings.isLocked ?? false);
+      } else {
+        // Reset to defaults if no view settings saved
+        setZoom(1);
+        setRotation(0);
+        setPan({ x: 0, y: 0 });
+        setCanvasSize({ width: 2000, height: 2000 });
+        setIsCanvasLocked(false);
+      }
     } else {
       // Create new floor with default settings
+      // If sync is enabled, use current floor's region config
+      const regionConfig = syncRegionsAcrossFloors ? floorPlan.regions : {
+        'north-west': { enabled: true, color: '#3b82f6', label: 'North-West', hasEntrance: true, width: 800, height: 700 },
+        'north-east': { enabled: true, color: '#10b981', label: 'North-East', hasEntrance: true, width: 1000, height: 700 },
+        'south-west': { enabled: true, color: '#f59e0b', label: 'South-West', hasEntrance: true, width: 800, height: 1100 },
+        'south-east': { enabled: true, color: '#8b5cf6', label: 'South-East', hasEntrance: true, width: 1000, height: 1100 }
+      };
+      
       setFloorPlan({
         building: floorPlan.building,
         floor: floorNumber,
-        regions: {
-          'north-west': { enabled: true, color: '#3b82f6', label: 'North-West', hasEntrance: true, width: 800, height: 700 },
-          'north-east': { enabled: true, color: '#10b981', label: 'North-East', hasEntrance: true, width: 1000, height: 700 },
-          'south-west': { enabled: true, color: '#f59e0b', label: 'South-West', hasEntrance: true, width: 800, height: 1100 },
-          'south-east': { enabled: true, color: '#8b5cf6', label: 'South-East', hasEntrance: true, width: 1000, height: 1100 }
-        },
+        regions: regionConfig,
         items: [],
         elevators: [
           { id: '1', position: { row: 2, col: 2 }, exits: ['north', 'south', 'east', 'west'] },
@@ -297,7 +463,8 @@ export default function FloorPlanEditorV2() {
             { id: '3', side: 'south', position: 0.25, width: 2, targetRegion: 'south-west', hasHallway: false },
             { id: '4', side: 'south', position: 0.75, width: 2, targetRegion: 'south-east', hasHallway: false },
           ]
-        }
+        },
+        drawings: []
       });
     }
   };
@@ -459,6 +626,59 @@ export default function FloorPlanEditorV2() {
     return { x: GRID_COLS / 2, y: GRID_ROWS / 2 };
   };
 
+  // Helper function to convert screen coordinates to canvas grid coordinates
+  const screenToGrid = (screenX: number, screenY: number): { gridX: number; gridY: number } => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { gridX: 0, gridY: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    
+    // Get mouse position relative to canvas element
+    const canvasX = screenX - rect.left;
+    const canvasY = screenY - rect.top;
+    
+    // Canvas rendering transformations (in order):
+    // 1. ctx.translate(pan.x + CANVAS_WIDTH/2, pan.y + CANVAS_HEIGHT/2)
+    // 2. ctx.rotate(rotation * PI/180)
+    // 3. ctx.scale(zoom, zoom)
+    // 4. ctx.translate(-CANVAS_WIDTH/2, -CANVAS_HEIGHT/2)
+    //
+    // To reverse, we need to undo in REVERSE order:
+    
+    // Step 1: Undo translate(-CANVAS_WIDTH/2, -CANVAS_HEIGHT/2)
+    // This means we ADD the center back
+    let x = canvasX + CANVAS_WIDTH / 2;
+    let y = canvasY + CANVAS_HEIGHT / 2;
+    
+    // Step 2: Undo scale(zoom, zoom)
+    // Divide by zoom
+    x = x / zoom;
+    y = y / zoom;
+    
+    // Step 3: Undo rotate(rotation)
+    // Rotate by -rotation
+    if (rotation !== 0) {
+      const angleRad = -(rotation * Math.PI) / 180;
+      const cos = Math.cos(angleRad);
+      const sin = Math.sin(angleRad);
+      const tempX = x * cos - y * sin;
+      const tempY = x * sin + y * cos;
+      x = tempX;
+      y = tempY;
+    }
+    
+    // Step 4: Undo translate(pan.x + CANVAS_WIDTH/2, pan.y + CANVAS_HEIGHT/2)
+    // Subtract the translation
+    x = x - (pan.x + CANVAS_WIDTH / 2);
+    y = y - (pan.y + CANVAS_HEIGHT / 2);
+    
+    // Convert to grid coordinates
+    const gridX = Math.floor(x / GRID_SIZE);
+    const gridY = Math.floor(y / GRID_SIZE);
+    
+    return { gridX, gridY };
+  };
+
   // Drawing
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -493,6 +713,12 @@ export default function FloorPlanEditorV2() {
     // Draw entrances - DISABLED: Only elevator entrance lanes are shown
     // drawEntrances(ctx);
 
+    // Draw drawing elements
+    floorPlan.drawings.forEach(element => {
+      const isBeingDragged = isDragging && draggedDrawing?.id === element.id;
+      drawDrawingElement(ctx, element, isBeingDragged);
+    });
+
     // Draw items
     floorPlan.items.forEach(item => {
       const isBeingDragged = isDragging && draggedItem?.id === item.id;
@@ -500,7 +726,7 @@ export default function FloorPlanEditorV2() {
     });
 
     ctx.restore();
-  }, [floorPlan, selectedItem, zoom, pan, rotation, isDragging, draggedItem, canvasSize]);
+  }, [floorPlan, selectedItem, selectedDrawingId, zoom, pan, rotation, isDragging, draggedItem, draggedDrawing, canvasSize]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -622,28 +848,28 @@ export default function FloorPlanEditorV2() {
       ctx.stroke();
     };
     
-    // Draw windows on outer perimeter walls based on building bounds
+    // Draw windows on EXTERIOR face of outer perimeter walls based on building bounds
     
-    // TOP WALL - continuous across entire building width
-    const topWallY = buildingTop - perimeterWallThickness + 2;
+    // TOP WALL - continuous across entire building width (OUTSIDE the wall)
+    const topWallY = buildingTop - perimeterWallThickness - windowHeight;
     for (let x = buildingLeft + GRID_SIZE; x < buildingRight - windowWidth; x += windowSpacing) {
       drawWindow(x, topWallY, windowWidth, windowHeight, false);
     }
     
-    // BOTTOM WALL - continuous across entire building width
-    const bottomWallY = buildingBottom + perimeterWallThickness - windowHeight - 2;
+    // BOTTOM WALL - continuous across entire building width (OUTSIDE the wall)
+    const bottomWallY = buildingBottom + perimeterWallThickness;
     for (let x = buildingLeft + GRID_SIZE; x < buildingRight - windowWidth; x += windowSpacing) {
       drawWindow(x, bottomWallY, windowWidth, windowHeight, false);
     }
     
-    // LEFT WALL - continuous across entire building height
-    const leftWallX = buildingLeft - perimeterWallThickness + 2;
+    // LEFT WALL - continuous across entire building height (OUTSIDE the wall)
+    const leftWallX = buildingLeft - perimeterWallThickness - verticalWindowWidth;
     for (let y = buildingTop + GRID_SIZE; y < buildingBottom - verticalWindowHeight; y += windowSpacing) {
       drawWindow(leftWallX, y, verticalWindowWidth, verticalWindowHeight, true);
     }
     
-    // RIGHT WALL - continuous across entire building height
-    const rightWallX = buildingRight + 2;
+    // RIGHT WALL - continuous across entire building height (OUTSIDE the wall)
+    const rightWallX = buildingRight + perimeterWallThickness;
     for (let y = buildingTop + GRID_SIZE; y < buildingBottom - verticalWindowHeight; y += windowSpacing) {
       drawWindow(rightWallX, y, verticalWindowWidth, verticalWindowHeight, true);
     }
@@ -1333,59 +1559,316 @@ export default function FloorPlanEditorV2() {
     ctx.fillText(item.region.toUpperCase(), x + width / 2, y + height - 5);
   };
 
+  const drawDrawingElement = (ctx: CanvasRenderingContext2D, element: DrawingElement, isBeingDragged: boolean = false) => {
+    const x = element.position.col * GRID_SIZE;
+    const y = element.position.row * GRID_SIZE;
+    const width = element.width * GRID_SIZE;
+    const height = element.height * GRID_SIZE;
+
+    ctx.save();
+    
+    // Apply rotation if needed
+    if (element.rotation !== 0) {
+      ctx.translate(x + width / 2, y + height / 2);
+      ctx.rotate((element.rotation * Math.PI) / 180);
+      ctx.translate(-(x + width / 2), -(y + height / 2));
+    }
+
+    const isSelected = selectedDrawingId === element.id;
+    
+    // Add shadow effect when dragging
+    if (isBeingDragged) {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+      ctx.shadowBlur = 15;
+      ctx.shadowOffsetX = 5;
+      ctx.shadowOffsetY = 5;
+    }
+
+    switch (element.type) {
+      case 'technical-room':
+        // Technical room background
+        ctx.fillStyle = '#fbbf2480'; // Orange/yellow transparent
+        ctx.fillRect(x, y, width, height);
+        
+        // Border
+        ctx.strokeStyle = isSelected ? '#22c55e' : '#f59e0b';
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.strokeRect(x, y, width, height);
+        
+        // Icon and label
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('🔧', x + width / 2, y + height / 2 - 10);
+        
+        if (element.roomType) {
+          ctx.font = '10px Arial';
+          const roomTypeLabel = element.roomType.charAt(0).toUpperCase() + element.roomType.slice(1);
+          ctx.fillText(roomTypeLabel, x + width / 2, y + height / 2 + 15);
+        }
+        
+        if (element.label) {
+          ctx.font = 'bold 9px Arial';
+          ctx.fillText(element.label, x + width / 2, y + height - 8);
+        }
+        break;
+
+      case 'wall':
+        // Wall
+        ctx.fillStyle = '#6b7280'; // Gray
+        ctx.fillRect(x, y, width, height);
+        
+        // Border for selected
+        if (isSelected) {
+          ctx.strokeStyle = '#22c55e';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(x, y, width, height);
+        }
+        
+        // Brick pattern
+        ctx.strokeStyle = '#4b5563';
+        ctx.lineWidth = 1;
+        const brickHeight = GRID_SIZE * 0.2;
+        for (let by = y; by < y + height; by += brickHeight) {
+          ctx.beginPath();
+          ctx.moveTo(x, by);
+          ctx.lineTo(x + width, by);
+          ctx.stroke();
+        }
+        
+        if (element.label) {
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 9px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(element.label, x + width / 2, y + height / 2);
+        }
+        break;
+
+      case 'toilet':
+        // Toilet background
+        ctx.fillStyle = '#a78bfa80'; // Purple transparent
+        ctx.fillRect(x, y, width, height);
+        
+        // Border
+        ctx.strokeStyle = isSelected ? '#22c55e' : '#8b5cf6';
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.strokeRect(x, y, width, height);
+        
+        // Icon
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        let toiletIcon = '🚻';
+        if (element.toiletType === 'men') toiletIcon = '🚹';
+        else if (element.toiletType === 'women') toiletIcon = '🚺';
+        else if (element.toiletType === 'accessible') toiletIcon = '♿';
+        
+        ctx.fillText(toiletIcon, x + width / 2, y + height / 2 + 5);
+        
+        if (element.label) {
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 9px Arial';
+          ctx.fillText(element.label, x + width / 2, y + height - 8);
+        }
+        break;
+
+      case 'emergency-exit':
+        // Emergency exit background
+        ctx.fillStyle = '#ef444480'; // Red transparent
+        ctx.fillRect(x, y, width, height);
+        
+        // Border
+        ctx.strokeStyle = isSelected ? '#22c55e' : '#dc2626';
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.strokeRect(x, y, width, height);
+        
+        // Icon and text
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('🚨', x + width / 2, y + height / 2 - 5);
+        
+        ctx.font = 'bold 8px Arial';
+        ctx.fillText('EXIT', x + width / 2, y + height / 2 + 10);
+        
+        if (element.label) {
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 9px Arial';
+          ctx.fillText(element.label, x + width / 2, y + height - 5);
+        }
+        break;
+
+      case 'balcony':
+        // Balcony background
+        ctx.fillStyle = '#34d39980'; // Green transparent
+        ctx.fillRect(x, y, width, height);
+        
+        // Border
+        ctx.strokeStyle = isSelected ? '#22c55e' : '#10b981';
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.strokeRect(x, y, width, height);
+        
+        // Diagonal lines pattern
+        ctx.strokeStyle = '#059669';
+        ctx.lineWidth = 1;
+        for (let i = -height; i < width; i += GRID_SIZE / 2) {
+          ctx.beginPath();
+          ctx.moveTo(x + i, y + height);
+          ctx.lineTo(x + i + height, y);
+          ctx.stroke();
+        }
+        
+        // Icon
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('🏡', x + width / 2, y + height / 2 + 5);
+        
+        if (element.label) {
+          ctx.font = 'bold 9px Arial';
+          ctx.fillText(element.label, x + width / 2, y + height - 8);
+        }
+        break;
+    }
+
+    ctx.restore();
+  };
+
   // Handlers
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - pan.x) / zoom;
-    const y = (e.clientY - rect.top - pan.y) / zoom;
-    
-    const gridX = Math.floor(x / GRID_SIZE);
-    const gridY = Math.floor(y / GRID_SIZE);
+    const { gridX, gridY } = screenToGrid(e.clientX, e.clientY);
 
-    // Check if clicked on an item
-    const clicked = floorPlan.items.find(item =>
-      gridX >= item.position.x && gridX < item.position.x + item.width &&
-      gridY >= item.position.y && gridY < item.position.y + item.height
-    );
-
-    setSelectedItem(clicked || null);
-  };
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - pan.x) / zoom;
-    const y = (e.clientY - rect.top - pan.y) / zoom;
-    
-    const gridX = Math.floor(x / GRID_SIZE);
-    const gridY = Math.floor(y / GRID_SIZE);
-
-    // Check if clicked on an item
+    // Check if clicked on an item FIRST (higher priority)
     const clicked = floorPlan.items.find(item =>
       gridX >= item.position.x && gridX < item.position.x + item.width &&
       gridY >= item.position.y && gridY < item.position.y + item.height
     );
 
     if (clicked) {
+      setSelectedItem(clicked);
+      setSelectedDrawingId(null);
+      return;
+    }
+
+    // Check if clicked on a drawing element (check from end to prioritize top elements)
+    // Use a minimum clickable size for thin elements (like walls)
+    const clickedDrawing = [...floorPlan.drawings].reverse().find(element => {
+      const col = element.position.col;
+      const row = element.position.row;
+      // Minimum clickable size of 1 grid cell for thin elements
+      const clickWidth = Math.max(element.width, 1);
+      const clickHeight = Math.max(element.height, 1);
+      return gridX >= col && gridX < col + clickWidth &&
+             gridY >= row && gridY < row + clickHeight;
+    });
+
+    if (clickedDrawing) {
+      setSelectedDrawingId(clickedDrawing.id);
+      setSelectedItem(null);
+    } else {
+      setSelectedItem(null);
+      setSelectedDrawingId(null);
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const { gridX, gridY } = screenToGrid(e.clientX, e.clientY);
+    
+    console.log('=== MOUSE DOWN DEBUG ===');
+    console.log('🖱️ Click at grid coordinates:', gridX, gridY);
+    console.log('📋 Total items on canvas:', floorPlan.items.length);
+    console.log('📐 Canvas state - Zoom:', zoom, 'Rotation:', rotation, 'Pan:', pan);
+    console.log('⌨️ Shift key pressed:', e.shiftKey);
+    console.log('🔒 Canvas locked:', isCanvasLocked);
+    
+    if (floorPlan.items.length > 0) {
+      console.log('🔍 Items on canvas:');
+      floorPlan.items.forEach(item => {
+        console.log(`  - ${item.name}: pos [${item.position.x}, ${item.position.y}], size [${item.width}×${item.height}]`);
+      });
+    }
+
+    // PRIORITY 1: If Shift is held, ALWAYS try to select objects (disable panning)
+    const forceObjectSelection = e.shiftKey;
+    
+    // Check if clicked on an item FIRST (higher priority than drawing elements)
+    const clicked = floorPlan.items.find(item => {
+      const isInBounds = gridX >= item.position.x && gridX < item.position.x + item.width &&
+                         gridY >= item.position.y && gridY < item.position.y + item.height;
+      console.log(`🔍 Checking ${item.name}: [${item.position.x}-${item.position.x + item.width}, ${item.position.y}-${item.position.y + item.height}] vs click [${gridX}, ${gridY}] = ${isInBounds}`);
+      return isInBounds;
+    });
+
+    if (clicked) {
       // Start dragging the item
+      console.log('✅✅✅ FOUND AND SELECTING ITEM:', clicked.name);
       setDraggedItem(clicked);
       setIsDragging(true);
+      setIsPanning(false); // Explicitly prevent panning
       setDragOffset({
         x: gridX - clicked.position.x,
         y: gridY - clicked.position.y
       });
-    } else {
-      // Start panning the canvas (especially useful when zoomed in)
+      setSelectedItem(clicked);
+      e.preventDefault(); // Prevent default behavior
+      e.stopPropagation(); // Stop event propagation
+      return;
+    }
+
+    console.log('❌ No item found at click position');
+
+    // Check if clicked on a drawing element (check from end to prioritize top elements)
+    // Use a minimum clickable size for thin elements (like walls)
+    const clickedDrawing = [...floorPlan.drawings].reverse().find(element => {
+      const col = element.position.col;
+      const row = element.position.row;
+      // Minimum clickable size of 1 grid cell for thin elements
+      const clickWidth = Math.max(element.width, 1);
+      const clickHeight = Math.max(element.height, 1);
+      const isInBounds = gridX >= col && gridX < col + clickWidth &&
+             gridY >= row && gridY < row + clickHeight;
+      if (isInBounds) {
+        console.log(`✅ Found ${element.type} at row:${row}, col:${col}, size:${element.width}×${element.height}`);
+      }
+      return isInBounds;
+    });
+
+    if (clickedDrawing) {
+      // Start dragging the drawing element
+      console.log('🎯 Starting drag of drawing element:', clickedDrawing.type);
+      setDraggedDrawing(clickedDrawing);
+      setIsDragging(true);
+      setIsPanning(false); // Explicitly prevent panning
+      setDragOffset({
+        x: gridX - clickedDrawing.position.col,
+        y: gridY - clickedDrawing.position.row
+      });
+      setSelectedDrawingId(clickedDrawing.id);
+      e.preventDefault(); // Prevent default behavior
+      e.stopPropagation(); // Stop event propagation
+      return;
+    }
+    
+    // Only start panning if:
+    // 1. We didn't click on anything
+    // 2. Canvas is not locked
+    // 3. Shift key is NOT pressed (Shift forces object selection mode)
+    if (!isCanvasLocked && !forceObjectSelection) {
+      console.log('💨 No element clicked, starting pan');
       setIsPanning(true);
       setPanStart({
         x: e.clientX - pan.x,
         y: e.clientY - pan.y
       });
+    } else if (forceObjectSelection) {
+      console.log('⌨️ Shift key pressed - object selection mode (no pan)');
+    } else {
+      console.log('🔒 Canvas is locked - panning disabled');
     }
   };
 
@@ -1402,44 +1885,74 @@ export default function FloorPlanEditorV2() {
       return;
     }
 
-    // Handle item dragging
-    if (!isDragging || !draggedItem) return;
+    // Handle drawing element dragging
+    if (isDragging && draggedDrawing) {
+      const { gridX, gridY } = screenToGrid(e.clientX, e.clientY);
 
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - pan.x) / zoom;
-    const y = (e.clientY - rect.top - pan.y) / zoom;
-    
-    const gridX = Math.floor(x / GRID_SIZE);
-    const gridY = Math.floor(y / GRID_SIZE);
+      // Calculate new position
+      const newCol = Math.max(0, Math.min(GRID_COLS - draggedDrawing.width, gridX - dragOffset.x));
+      const newRow = Math.max(0, Math.min(GRID_ROWS - draggedDrawing.height, gridY - dragOffset.y));
 
-    // Calculate new position
-    const newX = Math.max(0, Math.min(GRID_COLS - draggedItem.width, gridX - dragOffset.x));
-    const newY = Math.max(0, Math.min(GRID_ROWS - draggedItem.height, gridY - dragOffset.y));
+      // Store position in ref for smooth animation
+      dragPosRef.current = { x: newCol, y: newRow };
 
-    // Store position in ref for smooth animation
-    dragPosRef.current = { x: newX, y: newY };
+      // Use requestAnimationFrame for smooth updates
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
 
-    // Use requestAnimationFrame for smooth updates
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = requestAnimationFrame(() => {
+        if (!dragPosRef.current || !draggedDrawing) return;
+
+        // Update drawing element position in state with sync
+        updateFloorPlanWithSync(prev => ({
+          ...prev,
+          drawings: prev.drawings.map(element =>
+            element.id === draggedDrawing.id
+              ? { ...element, position: { row: dragPosRef.current!.y, col: dragPosRef.current!.x } }
+              : element
+          )
+        }));
+
+        // Update dragged drawing reference
+        setDraggedDrawing(prev => prev ? { ...prev, position: { row: dragPosRef.current!.y, col: dragPosRef.current!.x } } : null);
+      });
+      return;
     }
 
-    animationFrameRef.current = requestAnimationFrame(() => {
-      if (!dragPosRef.current || !draggedItem) return;
+    // Handle item dragging
+    if (isDragging && draggedItem) {
+      const { gridX, gridY } = screenToGrid(e.clientX, e.clientY);
 
-      // Update item position in state
-      setFloorPlan(prev => ({
-        ...prev,
-        items: prev.items.map(item =>
-          item.id === draggedItem.id
-            ? { ...item, position: dragPosRef.current! }
-            : item
-        )
-      }));
+      // Calculate new position
+      const newX = Math.max(0, Math.min(GRID_COLS - draggedItem.width, gridX - dragOffset.x));
+      const newY = Math.max(0, Math.min(GRID_ROWS - draggedItem.height, gridY - dragOffset.y));
 
-      // Update dragged item reference
-      setDraggedItem(prev => prev ? { ...prev, position: dragPosRef.current! } : null);
-    });
+      // Store position in ref for smooth animation
+      dragPosRef.current = { x: newX, y: newY };
+
+      // Use requestAnimationFrame for smooth updates
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      animationFrameRef.current = requestAnimationFrame(() => {
+        if (!dragPosRef.current || !draggedItem) return;
+
+        // Update item position in state
+        setFloorPlan(prev => ({
+          ...prev,
+          items: prev.items.map(item =>
+            item.id === draggedItem.id
+              ? { ...item, position: dragPosRef.current! }
+              : item
+          )
+        }));
+
+        // Update dragged item reference
+        setDraggedItem(prev => prev ? { ...prev, position: dragPosRef.current! } : null);
+      });
+    }
   };
 
   const handleMouseUp = () => {
@@ -1460,32 +1973,122 @@ export default function FloorPlanEditorV2() {
       setSelectedItem(draggedItem);
     }
     setDraggedItem(null);
+    
+    // Stop drawing element dragging
+    if (draggedDrawing) {
+      setSelectedDrawingId(draggedDrawing.id);
+    }
+    setDraggedDrawing(null);
   };
 
   const toggleRegion = (region: Region) => {
-    setFloorPlan(prev => ({
-      ...prev,
-      regions: {
-        ...prev.regions,
-        [region]: {
-          ...prev.regions[region],
-          enabled: !prev.regions[region].enabled
+    setFloorPlan(prev => {
+      const updated = {
+        ...prev,
+        regions: {
+          ...prev.regions,
+          [region]: {
+            ...prev.regions[region],
+            enabled: !prev.regions[region].enabled
+          }
         }
+      };
+      
+      // If sync is enabled, update all floors
+      if (syncRegionsAcrossFloors) {
+        syncFloorConfigToAllFloors(updated);
       }
-    }));
+      
+      return updated;
+    });
   };
 
   const toggleEntrance = (region: Region) => {
-    setFloorPlan(prev => ({
-      ...prev,
-      regions: {
-        ...prev.regions,
-        [region]: {
-          ...prev.regions[region],
-          hasEntrance: !prev.regions[region].hasEntrance
+    setFloorPlan(prev => {
+      const updated = {
+        ...prev,
+        regions: {
+          ...prev.regions,
+          [region]: {
+            ...prev.regions[region],
+            hasEntrance: !prev.regions[region].hasEntrance
+          }
         }
+      };
+      
+      // If sync is enabled, update all floors
+      if (syncRegionsAcrossFloors) {
+        syncFloorConfigToAllFloors(updated);
       }
-    }));
+      
+      return updated;
+    });
+  };
+
+  // Sync complete floor configuration to all floors (regions, elevators, staircases, zone, drawings)
+  const syncFloorConfigToAllFloors = (floorConfig: FloorPlan) => {
+    const updatedFloors = new Map(savedFloors);
+    
+    // Update all floors with the new configuration
+    availableFloors.forEach((floorNumber) => {
+      const existingFloor = updatedFloors.get(floorNumber);
+      if (existingFloor) {
+        updatedFloors.set(floorNumber, {
+          ...existingFloor,
+          regions: { ...floorConfig.regions },
+          elevators: floorConfig.elevators.map(e => ({ ...e })),
+          staircases: floorConfig.staircases.map(s => ({ ...s })),
+          elevatorZone: {
+            ...floorConfig.elevatorZone,
+            entrances: floorConfig.elevatorZone.entrances.map(e => ({ ...e }))
+          },
+          drawings: (floorConfig.drawings || []).map(d => ({ ...d }))
+        });
+      }
+    });
+    
+    setSavedFloors(updatedFloors);
+    
+    // Save to localStorage
+    const floorsObject = Object.fromEntries(updatedFloors);
+    localStorage.setItem('floorPlans', JSON.stringify(floorsObject));
+  };
+
+  // Handle region size changes with sync
+  const updateRegionSize = (region: Region, dimension: 'width' | 'height', value: number) => {
+    setFloorPlan(prev => {
+      const updated = {
+        ...prev,
+        regions: {
+          ...prev.regions,
+          [region]: {
+            ...prev.regions[region],
+            [dimension]: value
+          }
+        }
+      };
+      
+      // If sync is enabled, update all floors
+      if (syncRegionsAcrossFloors) {
+        syncFloorConfigToAllFloors(updated);
+      }
+      
+      return updated;
+    });
+  };
+
+  // Helper function to update floor plan with automatic sync
+  const updateFloorPlanWithSync = (updater: (prev: FloorPlan) => FloorPlan) => {
+    setFloorPlan(prev => {
+      const updated = updater(prev);
+      
+      // If sync is enabled, update all floors
+      if (syncRegionsAcrossFloors) {
+        syncFloorConfigToAllFloors(updated);
+      }
+      
+      return updated;
+    });
   };
 
   const addItemToFloorPlan = (backendItem: any, type: 'island' | 'meeting-room', region: Region) => {
@@ -1540,13 +2143,99 @@ export default function FloorPlanEditorV2() {
             <Building2 className="inline mr-0.5" size={10} />
             {floorPlan.building} - Floor {floorPlan.floor}
           </div>
+
+          {/* Floor Management - Moved Above Tabs */}
+          <div className="mb-2 space-y-1 p-1 bg-gray-700/30 rounded">
+            <button
+              onClick={() => setShowFloorManager(!showFloorManager)}
+              className="w-full px-1.5 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center justify-center gap-0.5 text-[11px] font-bold"
+              title="Manage Floors"
+            >
+              <Layers size={12} />
+              Floors ({availableFloors.length})
+            </button>
+            
+            {showFloorManager && (
+              <div className="space-y-1 mt-1">
+                <div className="text-[10px] text-gray-400 font-bold mb-0.5">Available:</div>
+                <div className="grid grid-cols-3 gap-0.5 max-h-24 overflow-y-auto">
+                  {availableFloors.map((floor) => (
+                    <div key={floor} className="relative">
+                      <button
+                        onClick={() => switchToFloor(floor)}
+                        className={`w-full px-1 py-0.5 rounded text-[10px] font-bold ${
+                          floor === floorPlan.floor
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                      >
+                        {floor}
+                      </button>
+                      {floor !== floorPlan.floor && (
+                        <button
+                          onClick={() => deleteFloor(floor)}
+                          className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center text-white text-[10px]"
+                          title="Delete floor"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex gap-0.5 mt-1">
+                  <input
+                    type="text"
+                    value={newFloorNumber}
+                    onChange={(e) => setNewFloorNumber(e.target.value)}
+                    placeholder="Floor #"
+                    className="flex-1 px-1 py-0.5 bg-gray-900 border border-gray-600 rounded text-white text-[10px]"
+                  />
+                  <button
+                    onClick={addNewFloor}
+                    className="px-1.5 py-0.5 bg-green-600 hover:bg-green-700 text-white rounded text-[10px] font-bold"
+                  >
+                    <Plus size={10} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sync Settings - Moved Above Tabs */}
+          {availableFloors.length > 1 && (
+            <div className="mb-2 p-1.5 bg-gray-700/30 rounded">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] text-gray-300 font-medium">Sync All Floors</span>
+                <button
+                  onClick={() => setSyncRegionsAcrossFloors(!syncRegionsAcrossFloors)}
+                  className={`px-2 py-0.5 rounded text-[9px] font-medium transition-colors ${
+                    syncRegionsAcrossFloors
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                  title={syncRegionsAcrossFloors ? 'Configuration synced across all floors' : 'Click to sync configuration across all floors'}
+                >
+                  {syncRegionsAcrossFloors ? '🔗 Synced' : '🔓 Independent'}
+                </button>
+              </div>
+              {syncRegionsAcrossFloors && (
+                <div className="p-1 bg-blue-900/20 border border-blue-700/30 rounded">
+                  <p className="text-[8px] text-blue-300">
+                    ℹ️ All changes (regions, elevators, staircases, zone, drawings) will apply to all {availableFloors.length} floors
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Tab Navigation */}
         <div className="flex border-b border-gray-700">
           <button
             onClick={() => setActiveTab('general')}
-            className={`flex-1 px-2 py-2 text-[10px] font-bold transition-colors ${
+            className={`flex-1 px-1.5 py-2 text-[9px] font-bold transition-colors ${
               activeTab === 'general'
                 ? 'bg-gray-700 text-white border-b-2 border-blue-500'
                 : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
@@ -1556,7 +2245,7 @@ export default function FloorPlanEditorV2() {
           </button>
           <button
             onClick={() => setActiveTab('elevators')}
-            className={`flex-1 px-2 py-2 text-[10px] font-bold transition-colors ${
+            className={`flex-1 px-1.5 py-2 text-[9px] font-bold transition-colors ${
               activeTab === 'elevators'
                 ? 'bg-gray-700 text-white border-b-2 border-blue-500'
                 : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
@@ -1566,7 +2255,7 @@ export default function FloorPlanEditorV2() {
           </button>
           <button
             onClick={() => setActiveTab('staircases')}
-            className={`flex-1 px-2 py-2 text-[10px] font-bold transition-colors ${
+            className={`flex-1 px-1.5 py-2 text-[9px] font-bold transition-colors ${
               activeTab === 'staircases'
                 ? 'bg-gray-700 text-white border-b-2 border-indigo-500'
                 : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
@@ -1576,13 +2265,23 @@ export default function FloorPlanEditorV2() {
           </button>
           <button
             onClick={() => setActiveTab('zone')}
-            className={`flex-1 px-2 py-2 text-[10px] font-bold transition-colors ${
+            className={`flex-1 px-1.5 py-2 text-[9px] font-bold transition-colors ${
               activeTab === 'zone'
                 ? 'bg-gray-700 text-white border-b-2 border-purple-500'
                 : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
             }`}
           >
             Zone
+          </button>
+          <button
+            onClick={() => setActiveTab('drawings')}
+            className={`flex-1 px-1.5 py-2 text-[9px] font-bold transition-colors ${
+              activeTab === 'drawings'
+                ? 'bg-gray-700 text-white border-b-2 border-green-500'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+            }`}
+          >
+            Drawings
           </button>
         </div>
 
@@ -1632,68 +2331,9 @@ export default function FloorPlanEditorV2() {
                 </label>
               </div>
 
-              {/* Floor Management */}
-              <div className="mb-2 space-y-1 p-1 bg-gray-700/30 rounded">
-                <button
-                  onClick={() => setShowFloorManager(!showFloorManager)}
-                  className="w-full px-1.5 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center justify-center gap-0.5 text-[11px] font-bold"
-                  title="Manage Floors"
-                >
-                  <Layers size={12} />
-                  Floors ({availableFloors.length})
-                </button>
-                
-                {showFloorManager && (
-                  <div className="space-y-1 mt-1">
-                    <div className="text-[10px] text-gray-400 font-bold mb-0.5">Available:</div>
-                    <div className="grid grid-cols-3 gap-0.5 max-h-24 overflow-y-auto">
-                      {availableFloors.map((floor) => (
-                        <div key={floor} className="relative">
-                          <button
-                            onClick={() => switchToFloor(floor)}
-                            className={`w-full px-1 py-0.5 rounded text-[10px] font-bold ${
-                              floor === floorPlan.floor
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            }`}
-                          >
-                            {floor}
-                          </button>
-                          {floor !== floorPlan.floor && (
-                            <button
-                              onClick={() => deleteFloor(floor)}
-                              className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center text-white text-[10px]"
-                              title="Delete floor"
-                            >
-                              ×
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <div className="flex gap-0.5 mt-1">
-                      <input
-                        type="text"
-                        value={newFloorNumber}
-                        onChange={(e) => setNewFloorNumber(e.target.value)}
-                        placeholder="Floor #"
-                        className="flex-1 px-1 py-0.5 bg-gray-900 border border-gray-600 rounded text-white text-[10px]"
-                      />
-                      <button
-                        onClick={addNewFloor}
-                        className="px-1.5 py-0.5 bg-green-600 hover:bg-green-700 text-white rounded text-[10px] font-bold"
-                      >
-                        <Plus size={10} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Regions */}
               <div className="mb-2">
-                <h4 className="text-[11px] font-bold text-white mb-1 flex items-center gap-0.5">
+                <h4 className="text-[11px] font-bold text-white flex items-center gap-0.5 mb-1">
                   <Navigation size={12} />
                   Building Regions
                 </h4>
@@ -1736,13 +2376,7 @@ export default function FloorPlanEditorV2() {
                                 max="1500"
                                 step="50"
                                 value={config.width}
-                                onChange={(e) => setFloorPlan(prev => ({
-                                  ...prev,
-                                  regions: {
-                                    ...prev.regions,
-                                    [key]: { ...prev.regions[key as Region], width: parseInt(e.target.value) }
-                                  }
-                                }))}
+                                onChange={(e) => updateRegionSize(key as Region, 'width', parseInt(e.target.value))}
                                 className="flex-1"
                               />
                               <span className="text-[9px] text-white w-10">{config.width}px</span>
@@ -1755,13 +2389,7 @@ export default function FloorPlanEditorV2() {
                                 max="1500"
                                 step="50"
                                 value={config.height}
-                                onChange={(e) => setFloorPlan(prev => ({
-                                  ...prev,
-                                  regions: {
-                                    ...prev.regions,
-                                    [key]: { ...prev.regions[key as Region], height: parseInt(e.target.value) }
-                                  }
-                                }))}
+                                onChange={(e) => updateRegionSize(key as Region, 'height', parseInt(e.target.value))}
                                 className="flex-1"
                               />
                               <span className="text-[9px] text-white w-10">{config.height}px</span>
@@ -1824,7 +2452,7 @@ export default function FloorPlanEditorV2() {
                         if (!usedPositions.has(`${newRow}-${newCol}`)) break;
                       }
                       const newId = String(Math.max(...floorPlan.elevators.map(e => parseInt(e.id)), 0) + 1);
-                      setFloorPlan(prev => ({
+                      updateFloorPlanWithSync(prev => ({
                         ...prev,
                         elevators: [
                           ...prev.elevators,
@@ -1842,7 +2470,7 @@ export default function FloorPlanEditorV2() {
                 <button
                   onClick={() => {
                     if (selectedElevatorId) {
-                      setFloorPlan(prev => ({
+                      updateFloorPlanWithSync(prev => ({
                         ...prev,
                         elevators: prev.elevators.filter(e => e.id !== selectedElevatorId)
                       }));
@@ -1891,7 +2519,7 @@ export default function FloorPlanEditorV2() {
                               checked={elevator.exits.includes(side)}
                               onChange={(e) => {
                                 const isChecked = e.target.checked;
-                                setFloorPlan(prev => ({
+                                updateFloorPlanWithSync(prev => ({
                                   ...prev,
                                   elevators: prev.elevators.map(elev =>
                                     elev.id === selectedElevatorId
@@ -1921,7 +2549,7 @@ export default function FloorPlanEditorV2() {
                         <button
                           onClick={() => {
                             if (elevator.position.row > 0) {
-                              setFloorPlan(prev => ({
+                              updateFloorPlanWithSync(prev => ({
                                 ...prev,
                                 elevators: prev.elevators.map(e =>
                                   e.id === selectedElevatorId
@@ -1941,7 +2569,7 @@ export default function FloorPlanEditorV2() {
                         <button
                           onClick={() => {
                             if (elevator.position.col > 0) {
-                              setFloorPlan(prev => ({
+                              updateFloorPlanWithSync(prev => ({
                                 ...prev,
                                 elevators: prev.elevators.map(e =>
                                   e.id === selectedElevatorId
@@ -1960,7 +2588,7 @@ export default function FloorPlanEditorV2() {
                         <button
                           onClick={() => {
                             if (elevator.position.col < 4) {
-                              setFloorPlan(prev => ({
+                              updateFloorPlanWithSync(prev => ({
                                 ...prev,
                                 elevators: prev.elevators.map(e =>
                                   e.id === selectedElevatorId
@@ -1980,7 +2608,7 @@ export default function FloorPlanEditorV2() {
                         <button
                           onClick={() => {
                             if (elevator.position.row < 4) {
-                              setFloorPlan(prev => ({
+                              updateFloorPlanWithSync(prev => ({
                                 ...prev,
                                 elevators: prev.elevators.map(e =>
                                   e.id === selectedElevatorId
@@ -2019,7 +2647,7 @@ export default function FloorPlanEditorV2() {
                       return;
                     }
                     const newId = (Math.max(0, ...floorPlan.staircases.map(s => parseInt(s.id))) + 1).toString();
-                    setFloorPlan(prev => ({
+                    updateFloorPlanWithSync(prev => ({
                       ...prev,
                       staircases: [...prev.staircases, { 
                         id: newId, 
@@ -2038,7 +2666,7 @@ export default function FloorPlanEditorV2() {
                 <button
                   onClick={() => {
                     if (!selectedStaircaseId) return;
-                    setFloorPlan(prev => ({
+                    updateFloorPlanWithSync(prev => ({
                       ...prev,
                       staircases: prev.staircases.filter(s => s.id !== selectedStaircaseId)
                     }));
@@ -2081,7 +2709,7 @@ export default function FloorPlanEditorV2() {
                       <select
                         value={staircase.direction}
                         onChange={(e) => {
-                          setFloorPlan(prev => ({
+                          updateFloorPlanWithSync(prev => ({
                             ...prev,
                             staircases: prev.staircases.map(s =>
                               s.id === selectedStaircaseId
@@ -2105,7 +2733,7 @@ export default function FloorPlanEditorV2() {
                           type="checkbox"
                           checked={!!staircase.entrance}
                           onChange={(e) => {
-                            setFloorPlan(prev => ({
+                            updateFloorPlanWithSync(prev => ({
                               ...prev,
                               staircases: prev.staircases.map(s =>
                                 s.id === selectedStaircaseId
@@ -2344,7 +2972,7 @@ export default function FloorPlanEditorV2() {
                   max="100"
                   step="5"
                   value={floorPlan.elevatorZone.size}
-                  onChange={(e) => setFloorPlan(prev => ({
+                  onChange={(e) => updateFloorPlanWithSync(prev => ({
                     ...prev,
                     elevatorZone: { ...prev.elevatorZone, size: parseInt(e.target.value) }
                   }))}
@@ -2357,7 +2985,7 @@ export default function FloorPlanEditorV2() {
                 <button
                   onClick={() => {
                     const newId = String(Math.max(...floorPlan.elevatorZone.entrances.map(e => parseInt(e.id)), 0) + 1);
-                    setFloorPlan(prev => ({
+                    updateFloorPlanWithSync(prev => ({
                       ...prev,
                       elevatorZone: {
                         ...prev.elevatorZone,
@@ -2376,7 +3004,7 @@ export default function FloorPlanEditorV2() {
                 <button
                   onClick={() => {
                     if (selectedEntranceId) {
-                      setFloorPlan(prev => ({
+                      updateFloorPlanWithSync(prev => ({
                         ...prev,
                         elevatorZone: {
                           ...prev.elevatorZone,
@@ -2530,6 +3158,371 @@ export default function FloorPlanEditorV2() {
               })()}
             </div>
           )}
+
+          {/* DRAWINGS TAB */}
+          {activeTab === 'drawings' && (
+            <div className="space-y-2">
+              <h4 className="text-[11px] font-bold text-white mb-1 flex items-center gap-0.5">
+                <Grid3x3 size={12} className="text-green-400" />
+                Drawing Elements ({floorPlan.drawings.length})
+              </h4>
+
+              {/* Element Type Selector */}
+              <div className="mb-2">
+                <label className="text-[9px] text-gray-400 mb-1 block">Add Element Type</label>
+                <div className="grid grid-cols-2 gap-1">
+                  <button
+                    onClick={() => {
+                      const newId = (Math.max(0, ...floorPlan.drawings.map(d => parseInt(d.id))) + 1).toString();
+                      updateFloorPlanWithSync(prev => ({
+                        ...prev,
+                        drawings: [...prev.drawings, {
+                          id: newId,
+                          type: 'technical-room',
+                          position: { row: 0, col: 0 },
+                          width: 3,
+                          height: 3,
+                          rotation: 0,
+                          roomType: 'electrical'
+                        }]
+                      }));
+                      setSelectedDrawingId(newId);
+                    }}
+                    className="px-2 py-1.5 rounded text-[9px] font-medium bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    🔧 Technical Room
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newId = (Math.max(0, ...floorPlan.drawings.map(d => parseInt(d.id))) + 1).toString();
+                      updateFloorPlanWithSync(prev => ({
+                        ...prev,
+                        drawings: [...prev.drawings, {
+                          id: newId,
+                          type: 'wall',
+                          position: { row: 0, col: 0 },
+                          width: 5,
+                          height: 0.2,
+                          rotation: 0,
+                          orientation: 'horizontal'
+                        }]
+                      }));
+                      setSelectedDrawingId(newId);
+                    }}
+                    className="px-2 py-1.5 rounded text-[9px] font-medium bg-gray-600 text-white hover:bg-gray-700"
+                  >
+                    🧱 Wall
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newId = (Math.max(0, ...floorPlan.drawings.map(d => parseInt(d.id))) + 1).toString();
+                      updateFloorPlanWithSync(prev => ({
+                        ...prev,
+                        drawings: [...prev.drawings, {
+                          id: newId,
+                          type: 'toilet',
+                          position: { row: 0, col: 0 },
+                          width: 2,
+                          height: 2,
+                          rotation: 0,
+                          toiletType: 'unisex'
+                        }]
+                      }));
+                      setSelectedDrawingId(newId);
+                    }}
+                    className="px-2 py-1.5 rounded text-[9px] font-medium bg-purple-600 text-white hover:bg-purple-700"
+                  >
+                    🚻 Toilet
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newId = (Math.max(0, ...floorPlan.drawings.map(d => parseInt(d.id))) + 1).toString();
+                      updateFloorPlanWithSync(prev => ({
+                        ...prev,
+                        drawings: [...prev.drawings, {
+                          id: newId,
+                          type: 'emergency-exit',
+                          position: { row: 0, col: 0 },
+                          width: 1.5,
+                          height: 0.3,
+                          rotation: 0
+                        }]
+                      }));
+                      setSelectedDrawingId(newId);
+                    }}
+                    className="px-2 py-1.5 rounded text-[9px] font-medium bg-red-600 text-white hover:bg-red-700"
+                  >
+                    🚨 Emergency Exit
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newId = (Math.max(0, ...floorPlan.drawings.map(d => parseInt(d.id))) + 1).toString();
+                      updateFloorPlanWithSync(prev => ({
+                        ...prev,
+                        drawings: [...prev.drawings, {
+                          id: newId,
+                          type: 'balcony',
+                          position: { row: 0, col: 0 },
+                          width: 4,
+                          height: 2,
+                          rotation: 0
+                        }]
+                      }));
+                      setSelectedDrawingId(newId);
+                    }}
+                    className="px-2 py-1.5 rounded text-[9px] font-medium bg-green-600 text-white hover:bg-green-700"
+                  >
+                    🏡 Balcony
+                  </button>
+                </div>
+              </div>
+
+              {/* Drawing Elements List */}
+              <div className="space-y-0.5 mb-2">
+                <div className="text-[9px] text-gray-400 mb-1">Placed Elements:</div>
+                {floorPlan.drawings.length === 0 ? (
+                  <div className="text-[8px] text-gray-500 italic p-2 bg-gray-900/30 rounded">
+                    No drawing elements yet. Click buttons above to add.
+                  </div>
+                ) : (
+                  floorPlan.drawings.map((drawing) => (
+                    <div key={drawing.id} className="flex items-center gap-1">
+                      <button
+                        onClick={() => setSelectedDrawingId(drawing.id)}
+                        className={`flex-1 px-1.5 py-0.5 rounded text-[9px] text-left ${
+                          selectedDrawingId === drawing.id
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                      >
+                        {drawing.type === 'technical-room' && '🔧'}
+                        {drawing.type === 'wall' && '🧱'}
+                        {drawing.type === 'toilet' && '🚻'}
+                        {drawing.type === 'emergency-exit' && '🚨'}
+                        {drawing.type === 'balcony' && '🏡'}
+                        {' '}
+                        {drawing.type.replace('-', ' ').toUpperCase()} #{drawing.id}
+                      </button>
+                      <button
+                        onClick={() => {
+                          updateFloorPlanWithSync(prev => ({
+                            ...prev,
+                            drawings: prev.drawings.filter(d => d.id !== drawing.id)
+                          }));
+                          if (selectedDrawingId === drawing.id) {
+                            setSelectedDrawingId(null);
+                          }
+                        }}
+                        className="px-1.5 py-0.5 rounded text-[9px] bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Selected Drawing Edit Controls */}
+              {selectedDrawingId && (() => {
+                const drawing = floorPlan.drawings.find(d => d.id === selectedDrawingId);
+                if (!drawing) return null;
+
+                return (
+                  <div className="mt-2 p-1.5 bg-gray-900/50 rounded border border-green-600/30">
+                    <div className="text-[9px] text-green-300 font-bold mb-1">
+                      Edit {drawing.type.replace('-', ' ').toUpperCase()} #{drawing.id}
+                    </div>
+
+                    {/* Position */}
+                    <div className="mb-1">
+                      <label className="text-[8px] text-gray-400">Position: R{drawing.position.row}, C{drawing.position.col}</label>
+                      <div className="grid grid-cols-2 gap-0.5 mt-0.5">
+                        <div>
+                          <input
+                            type="number"
+                            value={drawing.position.row}
+                            onChange={(e) => {
+                              updateFloorPlanWithSync(prev => ({
+                                ...prev,
+                                drawings: prev.drawings.map(d =>
+                                  d.id === selectedDrawingId
+                                    ? { ...d, position: { ...d.position, row: parseInt(e.target.value) || 0 } }
+                                    : d
+                                )
+                              }));
+                            }}
+                            className="w-full px-1 py-0.5 rounded text-[9px] bg-gray-700 text-white border border-gray-600"
+                            placeholder="Row"
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="number"
+                            value={drawing.position.col}
+                            onChange={(e) => {
+                              updateFloorPlanWithSync(prev => ({
+                                ...prev,
+                                drawings: prev.drawings.map(d =>
+                                  d.id === selectedDrawingId
+                                    ? { ...d, position: { ...d.position, col: parseInt(e.target.value) || 0 } }
+                                    : d
+                                )
+                              }));
+                            }}
+                            className="w-full px-1 py-0.5 rounded text-[9px] bg-gray-700 text-white border border-gray-600"
+                            placeholder="Col"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dimensions */}
+                    <div className="mb-1">
+                      <label className="text-[8px] text-gray-400">Size: {drawing.width} × {drawing.height} cells</label>
+                      <div className="grid grid-cols-2 gap-0.5 mt-0.5">
+                        <div>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={drawing.width}
+                            onChange={(e) => {
+                              updateFloorPlanWithSync(prev => ({
+                                ...prev,
+                                drawings: prev.drawings.map(d =>
+                                  d.id === selectedDrawingId
+                                    ? { ...d, width: parseFloat(e.target.value) || 1 }
+                                    : d
+                                )
+                              }));
+                            }}
+                            className="w-full px-1 py-0.5 rounded text-[9px] bg-gray-700 text-white border border-gray-600"
+                            placeholder="Width"
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={drawing.height}
+                            onChange={(e) => {
+                              updateFloorPlanWithSync(prev => ({
+                                ...prev,
+                                drawings: prev.drawings.map(d =>
+                                  d.id === selectedDrawingId
+                                    ? { ...d, height: parseFloat(e.target.value) || 1 }
+                                    : d
+                                )
+                              }));
+                            }}
+                            className="w-full px-1 py-0.5 rounded text-[9px] bg-gray-700 text-white border border-gray-600"
+                            placeholder="Height"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Rotation */}
+                    <div className="mb-1">
+                      <label className="text-[8px] text-gray-400">Rotation: {drawing.rotation}°</label>
+                      <select
+                        value={drawing.rotation}
+                        onChange={(e) => {
+                          updateFloorPlanWithSync(prev => ({
+                            ...prev,
+                            drawings: prev.drawings.map(d =>
+                              d.id === selectedDrawingId
+                                ? { ...d, rotation: parseInt(e.target.value) as 0 | 90 | 180 | 270 }
+                                : d
+                            )
+                          }));
+                        }}
+                        className="w-full px-1.5 py-0.5 rounded text-[9px] bg-gray-700 text-white border border-gray-600"
+                      >
+                        <option value="0">0° (Normal)</option>
+                        <option value="90">90° (Right)</option>
+                        <option value="180">180° (Upside Down)</option>
+                        <option value="270">270° (Left)</option>
+                      </select>
+                    </div>
+
+                    {/* Technical Room Type */}
+                    {drawing.type === 'technical-room' && drawing.roomType && (
+                      <div className="mb-1">
+                        <label className="text-[8px] text-gray-400">Room Type</label>
+                        <select
+                          value={drawing.roomType}
+                          onChange={(e) => {
+                            updateFloorPlanWithSync(prev => ({
+                              ...prev,
+                              drawings: prev.drawings.map(d =>
+                                d.id === selectedDrawingId
+                                  ? { ...d, roomType: e.target.value as any }
+                                  : d
+                              )
+                            }));
+                          }}
+                          className="w-full px-1.5 py-0.5 rounded text-[9px] bg-gray-700 text-white border border-gray-600"
+                        >
+                          <option value="electrical">⚡ Electrical</option>
+                          <option value="mechanical">⚙️ Mechanical</option>
+                          <option value="server">🖥️ Server</option>
+                          <option value="storage">📦 Storage</option>
+                          <option value="janitor">🧹 Janitor</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Toilet Type */}
+                    {drawing.type === 'toilet' && drawing.toiletType && (
+                      <div className="mb-1">
+                        <label className="text-[8px] text-gray-400">Toilet Type</label>
+                        <select
+                          value={drawing.toiletType}
+                          onChange={(e) => {
+                            updateFloorPlanWithSync(prev => ({
+                              ...prev,
+                              drawings: prev.drawings.map(d =>
+                                d.id === selectedDrawingId
+                                  ? { ...d, toiletType: e.target.value as any }
+                                  : d
+                              )
+                            }));
+                          }}
+                          className="w-full px-1.5 py-0.5 rounded text-[9px] bg-gray-700 text-white border border-gray-600"
+                        >
+                          <option value="men">🚹 Men</option>
+                          <option value="women">🚺 Women</option>
+                          <option value="accessible">♿ Accessible</option>
+                          <option value="unisex">🚻 Unisex</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Label */}
+                    <div className="mb-1">
+                      <label className="text-[8px] text-gray-400">Label (Optional)</label>
+                      <input
+                        type="text"
+                        value={drawing.label || ''}
+                        onChange={(e) => {
+                          updateFloorPlanWithSync(prev => ({
+                            ...prev,
+                            drawings: prev.drawings.map(d =>
+                              d.id === selectedDrawingId
+                                ? { ...d, label: e.target.value }
+                                : d
+                            )
+                          }));
+                        }}
+                        className="w-full px-1.5 py-0.5 rounded text-[9px] bg-gray-700 text-white border border-gray-600"
+                        placeholder="Optional label"
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
           
         </div>
 
@@ -2547,78 +3540,103 @@ export default function FloorPlanEditorV2() {
       {/* Main Content Area - Canvas and Properties */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Canvas Toolbar */}
-        <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-4">
+        <div className="bg-gray-800 border-b border-gray-700 px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
             {/* Zoom Controls */}
-            <div className="flex items-center gap-2">
-              <span className="text-[10.5px] font-bold text-white">Zoom</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-bold text-white">Zoom</span>
               <button
                 onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
-                className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded"
+                className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded"
                 title="Zoom Out"
               >
                 <ZoomOut size={10} />
               </button>
-              <span className="px-3 py-1.5 bg-gray-700 text-white rounded text-[10.5px] min-w-[65px] text-center font-medium">
+              <span className="px-2 py-1 bg-gray-700 text-white rounded text-[9px] min-w-[50px] text-center font-medium">
                 {Math.round(zoom * 100)}%
               </span>
               <button
                 onClick={() => setZoom(Math.min(4, zoom + 0.1))}
-                className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded"
+                className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded"
                 title="Zoom In"
               >
                 <ZoomIn size={10} />
               </button>
               <button
                 onClick={() => setZoom(1)}
-                className="px-2.5 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded text-[9px]"
+                className="px-1.5 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-[8px]"
                 title="Reset Zoom"
               >
-                Reset (100%)
+                100%
               </button>
               <button
                 onClick={() => setPan({ x: 0, y: 0 })}
-                className="px-2.5 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded text-[9px]"
+                className="px-1.5 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-[8px]"
                 title="Reset Pan"
               >
-                Reset Pan
+                Pan
               </button>
             </div>
 
             {/* Rotation Controls */}
-            <div className="flex items-center gap-2">
-              <span className="text-[10.5px] font-bold text-white">Rotation</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-bold text-white">Rotate</span>
               <button
                 onClick={() => setRotation((rotation - 90 + 360) % 360)}
-                className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded"
+                className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded"
                 title="Rotate Counter-Clockwise"
               >
                 <RotateCcw size={10} />
               </button>
-              <span className="px-3 py-1.5 bg-gray-700 text-white rounded text-[10.5px] min-w-[50px] text-center font-medium">
+              <span className="px-2 py-1 bg-gray-700 text-white rounded text-[9px] min-w-[40px] text-center font-medium">
                 {rotation}°
               </span>
               <button
                 onClick={() => setRotation((rotation + 90) % 360)}
-                className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded"
+                className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded"
                 title="Rotate Clockwise"
               >
                 <RotateCw size={10} />
               </button>
               <button
                 onClick={() => setRotation(0)}
-                className="px-2.5 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded text-[9px]"
+                className="px-1.5 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-[8px]"
                 title="Reset Rotation"
               >
-                Reset
+                0°
+              </button>
+            </div>
+
+            {/* Canvas Lock Toggle */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setIsCanvasLocked(!isCanvasLocked)}
+                className={`px-2 py-1 rounded text-[8px] font-medium flex items-center gap-1 transition-colors ${
+                  isCanvasLocked
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+                title={isCanvasLocked ? 'Canvas Locked - Click to Unlock' : 'Canvas Unlocked - Click to Lock'}
+              >
+                {isCanvasLocked ? (
+                  <>
+                    <Lock size={11} />
+                    Locked
+                  </>
+                ) : (
+                  <>
+                    <Unlock size={11} />
+                    Unlocked
+                  </>
+                )}
               </button>
             </div>
 
             {/* Canvas Size Controls */}
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-[10.5px] font-bold text-white whitespace-nowrap">Canvas Size</span>
-              <div className="flex items-center gap-1.5">
-                <label className="text-[9px] text-gray-400 font-medium">W:</label>
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <span className="text-[9px] font-bold text-white whitespace-nowrap">Size</span>
+              <div className="flex items-center gap-1">
+                <label className="text-[8px] text-gray-400 font-medium">W:</label>
                 <input
                   type="range"
                   min="800"
@@ -2626,12 +3644,12 @@ export default function FloorPlanEditorV2() {
                   step="100"
                   value={canvasSize.width}
                   onChange={(e) => setCanvasSize(prev => ({ ...prev, width: parseInt(e.target.value) }))}
-                  className="w-24"
+                  className="w-20"
                 />
-                <span className="text-[9px] text-white w-14 font-medium">{canvasSize.width}px</span>
+                <span className="text-[8px] text-white w-12 font-medium">{canvasSize.width}px</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <label className="text-[9px] text-gray-400 font-medium">H:</label>
+              <div className="flex items-center gap-1">
+                <label className="text-[8px] text-gray-400 font-medium">H:</label>
                 <input
                   type="range"
                   min="600"
@@ -2639,13 +3657,13 @@ export default function FloorPlanEditorV2() {
                   step="100"
                   value={canvasSize.height}
                   onChange={(e) => setCanvasSize(prev => ({ ...prev, height: parseInt(e.target.value) }))}
-                  className="w-24"
+                  className="w-20"
                 />
-                <span className="text-[9px] text-white w-14 font-medium">{canvasSize.height}px</span>
+                <span className="text-[8px] text-white w-12 font-medium">{canvasSize.height}px</span>
               </div>
               <button
                 onClick={() => setCanvasSize({ width: 2000, height: 2000 })}
-                className="px-2.5 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded text-[9px] whitespace-nowrap"
+                className="px-1.5 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-[8px] whitespace-nowrap"
                 title="Reset to Default"
               >
                 Reset
@@ -2699,6 +3717,60 @@ export default function FloorPlanEditorV2() {
                 style={{ color: floorPlan.regions[selectedItem.region].color }}
               >
                 {selectedItem.region.toUpperCase()}
+              </div>
+            </div>
+
+            {/* Position Controls */}
+            <div>
+              <div className="text-sm text-gray-400 mb-2">Position (Grid Cells)</div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-xs text-gray-500">X</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max={GRID_COLS - selectedItem.width}
+                    value={selectedItem.position.x}
+                    onChange={(e) => {
+                      const newX = parseInt(e.target.value) || 0;
+                      setFloorPlan(prev => ({
+                        ...prev,
+                        items: prev.items.map(item =>
+                          item.id === selectedItem.id
+                            ? { ...item, position: { ...item.position, x: Math.max(0, Math.min(GRID_COLS - item.width, newX)) } }
+                            : item
+                        )
+                      }));
+                      setSelectedItem(prev => prev ? { ...prev, position: { ...prev.position, x: Math.max(0, Math.min(GRID_COLS - prev.width, newX)) } } : null);
+                    }}
+                    className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs text-gray-500">Y</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max={GRID_ROWS - selectedItem.height}
+                    value={selectedItem.position.y}
+                    onChange={(e) => {
+                      const newY = parseInt(e.target.value) || 0;
+                      setFloorPlan(prev => ({
+                        ...prev,
+                        items: prev.items.map(item =>
+                          item.id === selectedItem.id
+                            ? { ...item, position: { ...item.position, y: Math.max(0, Math.min(GRID_ROWS - item.height, newY)) } }
+                            : item
+                        )
+                      }));
+                      setSelectedItem(prev => prev ? { ...prev, position: { ...prev.position, y: Math.max(0, Math.min(GRID_ROWS - prev.height, newY)) } } : null);
+                    }}
+                    className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                  />
+                </div>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Size: {selectedItem.width} × {selectedItem.height} cells
               </div>
             </div>
 
