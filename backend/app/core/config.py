@@ -34,5 +34,14 @@ class Settings(BaseSettings):
     # Artifacts storage
     ARTIFACTS_DIR: str = "/tmp/testmanager/artifacts"
 
+    # Notifications
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_STARTTLS: bool = True
+    NOTIFICATION_EMAIL_SENDER: str = ""
+    SLACK_WEBHOOK_TIMEOUT_SECONDS: int = 10
+
 
 settings = Settings()
