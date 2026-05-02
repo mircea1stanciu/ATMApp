@@ -1,0 +1,7 @@
+{
+  "stepDefinitions": "cypress/e2e/features/**/*.steps.{js,ts}",
+  "typescript": {
+    "enabled": true
+  }
+}
+
