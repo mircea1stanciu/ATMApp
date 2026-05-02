@@ -2,6 +2,7 @@ import axios from 'axios'
 import type {
   Branch,
   ExecuteRunResponse,
+  GitHubTreeItem,
   Project,
   TestRun,
   TestRunDetails,
@@ -94,6 +95,10 @@ export const apiService = {
     return response.data
   },
 
+  async deleteProject(projectId: string): Promise<void> {
+    await api.delete(`/projects/${projectId}`)
+  },
+
   async listBranches(projectId: string): Promise<Branch[]> {
     const response = await api.get<Branch[]>(`/projects/${projectId}/branches`)
     return response.data
@@ -140,8 +145,77 @@ export const apiService = {
     return response.data
   },
 
+  async cancelRun(runId: string): Promise<void> {
+    await api.post(`/runs/${runId}/cancel`)
+  },
+
+  async deleteRun(runId: string): Promise<void> {
+    await api.delete(`/runs/${runId}`)
+  },
+
+  async deleteSuite(suiteId: string): Promise<void> {
+    await api.delete(`/suites/${suiteId}`)
+  },
+
   async getRunDetails(runId: string): Promise<TestRunDetails> {
     const response = await api.get<TestRunDetails>(`/runs/${runId}`)
+    return response.data
+  },
+
+  // Admin: user management
+  async listUsers(): Promise<UserResponse[]> {
+    const response = await api.get<UserResponse[]>('/auth/users')
+    return response.data
+  },
+
+  async updateUser(userId: string, data: { email?: string; full_name?: string; role?: string; is_active?: boolean; password?: string }): Promise<UserResponse> {
+    const response = await api.patch<UserResponse>(`/auth/users/${userId}`, data)
+    return response.data
+  },
+
+  // Admin: settings
+  async getSettings(): Promise<{ github_token_set: boolean; github_token_preview: string; github_mcp_base_url: string }> {
+    const response = await api.get('/settings')
+    return response.data
+  },
+
+  async saveGithubSettings(payload: { github_token?: string; github_mcp_base_url?: string }): Promise<{ github_token_set: boolean; github_token_preview: string; github_mcp_base_url: string }> {
+    const response = await api.patch('/settings/github', payload)
+    return response.data
+  },
+
+  async testGithubConnection(): Promise<{ ok: boolean; login?: string; name?: string; plan?: string; error?: string }> {
+    const response = await api.post('/settings/github/test')
+    return response.data
+  },
+
+  // Per-project GitHub settings (Automation Lead or Admin)
+  async getProjectGithub(projectId: string): Promise<{ github_token_set: boolean; github_token_preview: string; github_repo_url: string }> {
+    const response = await api.get(`/projects/${projectId}/github`)
+    return response.data
+  },
+
+  async saveProjectGithub(projectId: string, payload: { github_token?: string; github_repo_url?: string }): Promise<{ github_token_set: boolean; github_token_preview: string; github_repo_url: string }> {
+    const response = await api.patch(`/projects/${projectId}/github`, payload)
+    return response.data
+  },
+
+  async testProjectGithub(projectId: string): Promise<{ ok: boolean; login?: string; name?: string; error?: string }> {
+    const response = await api.post(`/projects/${projectId}/github/test`)
+    return response.data
+  },
+
+  async disconnectProjectGithub(projectId: string): Promise<void> {
+    await api.delete(`/projects/${projectId}/github`)
+  },
+
+  async analyzeProjectRepo(projectId: string): Promise<{ frameworks: string[]; suites: string[]; files_count: number }> {
+    const response = await api.get(`/projects/${projectId}/github/analyze`)
+    return response.data
+  },
+
+  async getProjectRepoTree(projectId: string, path = ''): Promise<GitHubTreeItem[]> {
+    const response = await api.get(`/projects/${projectId}/github/tree`, { params: { path } })
     return response.data
   },
 

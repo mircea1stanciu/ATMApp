@@ -26,7 +26,7 @@ class AuthService:
             email=user_data.email,
             hashed_password=get_password_hash(user_data.password),
             full_name=user_data.full_name,
-            role=UserRole.developer,
+            role=UserRole.automation_user,
             is_active=True,
         )
         db.add(user)
@@ -69,3 +69,47 @@ class AuthService:
         stmt = select(User).where(User.email == email)
         result = await db.execute(stmt)
         return result.scalars().first()
+
+    @staticmethod
+    async def list_users(db: AsyncSession) -> list[User]:
+        """List all users (admin only)."""
+        stmt = select(User).order_by(User.created_at)
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def update_user(
+        db: AsyncSession,
+        user_id: str,
+        email: Optional[str] = None,
+        full_name: Optional[str] = None,
+        role: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        password: Optional[str] = None,
+    ) -> User:
+        """Update a user's profile / role (admin only)."""
+        stmt = select(User).where(User.id == user_id)
+        result = await db.execute(stmt)
+        user = result.scalars().first()
+        if not user:
+            raise ValueError("User not found")
+        if email is not None:
+            user.email = email
+        if full_name is not None:
+            user.full_name = full_name
+        if role is not None:
+            user.role = UserRole(role)
+        if is_active is not None:
+            user.is_active = is_active
+        if password is not None:
+            from app.core.security import get_password_hash
+            user.hashed_password = get_password_hash(password)
+        try:
+            await db.commit()
+            await db.refresh(user)
+        except IntegrityError as e:
+            await db.rollback()
+            if "email" in str(e).lower():
+                raise ValueError("Email already exists")
+            raise ValueError(f"Database error: {str(e)}")
+        return user

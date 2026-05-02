@@ -1,12 +1,12 @@
 import type { LucideIcon } from 'lucide-react'
 
-const PALETTE: Record<string, string> = {
-  cyan:    'from-cyan-500/20 to-cyan-500/5 text-cyan-400',
-  emerald: 'from-emerald-500/20 to-emerald-500/5 text-emerald-400',
-  rose:    'from-rose-500/20 to-rose-500/5 text-rose-400',
-  amber:   'from-amber-500/20 to-amber-500/5 text-amber-400',
-  indigo:  'from-indigo-500/20 to-indigo-500/5 text-indigo-400',
-  blue:    'from-blue-500/20 to-blue-500/5 text-blue-400',
+const PALETTE: Record<string, { icon: string; bg: string }> = {
+  cyan:    { icon: 'text-cyan-600 dark:text-cyan-400',    bg: 'bg-cyan-100 dark:bg-cyan-500/20' },
+  emerald: { icon: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-500/20' },
+  rose:    { icon: 'text-rose-600 dark:text-rose-400',    bg: 'bg-rose-100 dark:bg-rose-500/20' },
+  amber:   { icon: 'text-amber-600 dark:text-amber-400',  bg: 'bg-amber-100 dark:bg-amber-500/20' },
+  indigo:  { icon: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-500/20' },
+  blue:    { icon: 'text-blue-600 dark:text-blue-400',    bg: 'bg-blue-100 dark:bg-blue-500/20' },
 }
 
 export function StatCard({
@@ -18,21 +18,17 @@ export function StatCard({
   accent: string
   sub?: string
 }) {
+  const palette = PALETTE[accent] ?? PALETTE.blue
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 transition-all duration-300 hover:border-white/[0.1] hover:bg-white/[0.04]">
-      <div className={`absolute inset-0 bg-gradient-to-br ${PALETTE[accent] || PALETTE.cyan} opacity-0 transition-opacity duration-300 group-hover:opacity-100`} />
-      <div className="relative flex items-center gap-3">
-        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${PALETTE[accent] || PALETTE.cyan} bg-gradient-to-br`}>
-          <Icon size={16} />
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-shadow p-4 md:p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${palette.bg} ${palette.icon}`}>
+          <Icon size={18} />
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <p className="text-xl font-bold tracking-tight text-white">{value}</p>
-            <p className="text-xs text-slate-400">{title}</p>
-          </div>
-          {sub && <p className="text-[10px] text-slate-500">{sub}</p>}
-        </div>
+        <span className="text-2xl font-bold text-gray-900 dark:text-white">{value}</span>
       </div>
+      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{title}</p>
+      {sub && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub}</p>}
     </div>
   )
 }

@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
+from typing import Optional, List
+from pydantic import BaseModel, EmailStr
 
 from app.db.session import get_db
 from app.core.security import (
@@ -11,6 +13,7 @@ from app.schemas.auth import (
     UserCreate, TokenResponse, RefreshTokenRequest, UserResponse
 )
 from app.services import AuthService
+from app.models.models import UserRole
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -126,3 +129,92 @@ async def get_current_user_info(
         created_at=current_user.created_at.isoformat(),
     )
 
+
+# ---------------------------------------------------------------------------
+# Permission helpers
+# ---------------------------------------------------------------------------
+
+def require_role(*roles: UserRole):
+    """Dependency factory: raise 403 if current user's role is not in allowed roles."""
+    async def _check(current_user=Depends(get_current_user)):
+        if current_user.role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions for this action",
+            )
+        return current_user
+    return _check
+
+require_admin = require_role(UserRole.admin)
+require_lead_or_above = require_role(UserRole.admin, UserRole.automation_lead)
+require_user_or_above = require_role(UserRole.admin, UserRole.automation_lead, UserRole.automation_user)
+
+
+# ---------------------------------------------------------------------------
+# Admin: user management
+# ---------------------------------------------------------------------------
+
+class UserUpdateRequest(BaseModel):
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = None
+
+
+VALID_ROLES = [r.value for r in UserRole]
+
+
+@router.get("/users", response_model=List[UserResponse])
+async def list_users(
+    _admin=Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """[Admin] List all users."""
+    users = await AuthService.list_users(db)
+    return [
+        UserResponse(
+            id=str(u.id),
+            email=u.email,
+            full_name=u.full_name,
+            role=u.role.value,
+            is_active=u.is_active,
+            created_at=u.created_at.isoformat(),
+        )
+        for u in users
+    ]
+
+
+@router.patch("/users/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: str,
+    body: UserUpdateRequest,
+    _admin=Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """[Admin] Update a user's role, name, active status or password."""
+    if body.role is not None and body.role not in VALID_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role. Valid roles: {VALID_ROLES}",
+        )
+    try:
+        user = await AuthService.update_user(
+            db,
+            user_id=user_id,
+            email=body.email,
+            full_name=body.full_name,
+            role=body.role,
+            is_active=body.is_active,
+            password=body.password,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return UserResponse(
+        id=str(user.id),
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role.value,
+        is_active=user.is_active,
+        created_at=user.created_at.isoformat(),
+    )

@@ -9,7 +9,7 @@ from app.services.test_run_service import TestRunService
 from app.services.test_suite_service import TestSuiteService
 from app.services.websocket_manager import connection_manager
 from app.workers.tasks import execute_test_run_task
-from app.api.v1.endpoints.auth import get_current_user
+from app.api.v1.endpoints.auth import get_current_user, require_user_or_above
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +20,9 @@ router = APIRouter()
 async def create_run(
     run_data: TestRunCreate,
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(get_current_user)
+    _user=Depends(require_user_or_above),
 ):
-    """Create a new test run."""
+    """Create a new test run. Requires Automation User or above."""
     # Verify suite exists
     suite = await TestSuiteService.get_suite(db, str(run_data.suite_id))
     if not suite:
@@ -85,6 +85,34 @@ async def list_runs_by_project(
     """List all test runs for a project."""
     runs = await TestRunService.list_runs_by_project(db, project_id, skip=skip, limit=limit)
     return [TestRunResponse.model_validate(r) for r in runs]
+
+
+@router.post("/{run_id}/cancel", response_model=dict)
+async def cancel_run(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_user_or_above),
+):
+    """Cancel a pending or running test run."""
+    run = await TestRunService.cancel_run(db, run_id)
+    if not run:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test run not found")
+    return {"status": "cancelled", "run_id": run_id}
+
+
+@router.delete("/{run_id}", response_model=dict)
+async def delete_run(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_user_or_above),
+):
+    """Delete a test run (cancels first if still running)."""
+    # Cancel if active
+    await TestRunService.cancel_run(db, run_id)
+    deleted = await TestRunService.delete_run(db, run_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test run not found")
+    return {"status": "deleted", "run_id": run_id}
 
 
 @router.post("/{run_id}/execute", response_model=dict)

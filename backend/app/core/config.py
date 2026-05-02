@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     # GitHub MCP
     GITHUB_TOKEN: str = ""
-    GITHUB_MCP_BASE_URL: str = "https://api.github.com"
+    GITHUB_MCP_BASE_URL: str = ""  # e.g. https://github.com/org/repo.git
 
     # Docker runner
     DOCKER_RUNNER_NETWORK: str = "none"

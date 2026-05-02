@@ -49,26 +49,27 @@ export default function DashboardPage() {
   const activeSuites = useMemo(() => suites.filter(s => s.active).length, [suites])
 
   return (
-    <div className="flex h-full flex-col gap-3">
-      {/* Row 1: Stats */}
-      <div className="grid shrink-0 gap-3 grid-cols-2 xl:grid-cols-4">
+    <div className="flex h-full flex-col gap-4">
+      {/* Stats row */}
+      <div className="grid shrink-0 gap-4 grid-cols-2 xl:grid-cols-4">
         <StatCard title="Total Runs" value={runs.length} icon={Activity} accent="indigo"
-          sub={runsByNewest[0]?.status ? `Ultimul: ${runsByNewest[0].status}` : 'niciun run'} />
+          sub={runsByNewest[0]?.status ? `Last: ${runsByNewest[0].status}` : 'no runs yet'} />
         <StatCard title="Pass Rate" value={`${avgPassRate}%`} icon={CheckCircle2} accent="emerald"
-          sub={`din ${runs.length} run-uri`} />
+          sub={`across ${runs.length} runs`} />
         <StatCard title="Failures" value={totalFailures} icon={XCircle} accent="rose"
-          sub="total eșuate" />
-        <StatCard title="Suite Active" value={activeSuites} icon={Timer} accent="cyan"
+          sub="total failed" />
+        <StatCard title="Active Suites" value={activeSuites} icon={Timer} accent="blue"
           sub={`${suites.length} total`} />
       </div>
 
-      {/* Row 2: Charts + Recent Runs — fills remaining space */}
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[1fr_380px]">
+      {/* Charts + Recent Runs */}
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[1fr_380px]">
         {/* Charts panel */}
-        <div className="min-h-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+        <div className="min-h-0 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-md p-4">
+          <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">Pass Rate Trend</h3>
           <Suspense fallback={
             <div className="flex h-full items-center justify-center">
-              <Loader2 size={20} className="animate-spin text-slate-500" />
+              <Loader2 size={20} className="animate-spin text-gray-400" />
             </div>
           }>
             <DashboardCharts runTrendData={runTrendData} />
@@ -76,35 +77,36 @@ export default function DashboardPage() {
         </div>
 
         {/* Recent runs panel */}
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]">
-          <div className="shrink-0 border-b border-white/[0.04] px-4 py-3">
-            <h3 className="text-sm font-semibold text-white">Ultimele execuții</h3>
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-md">
+          <div className="shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Recent Runs</h3>
           </div>
           <div className="flex-1 overflow-y-auto">
             {runsByNewest.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center text-center px-4">
-                <Activity size={24} className="mb-2 text-slate-700" />
-                <p className="text-sm text-slate-500">Nu există runs.</p>
-                <button onClick={() => navigate('/runs')} className="mt-2 text-xs text-cyan-400 hover:text-cyan-300">
-                  Creează primul run →
+              <div className="flex h-full flex-col items-center justify-center text-center px-4 py-8">
+                <Activity size={28} className="mb-3 text-gray-300 dark:text-gray-600" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">No runs yet.</p>
+                <button onClick={() => navigate('/runs')}
+                  className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                  Create your first run →
                 </button>
               </div>
             ) : (
-              <div className="divide-y divide-white/[0.03]">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
                 {runsByNewest.slice(0, 20).map(run => (
                   <button
                     key={run.id}
                     onClick={() => { useAppStore.getState().setSelectedRunId(run.id); navigate('/runs') }}
-                    className="flex w-full items-center justify-between px-4 py-2.5 text-left transition hover:bg-white/[0.02]"
+                    className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-gray-50 dark:hover:bg-gray-700/30"
                   >
                     <div className="flex items-center gap-2.5">
-                      <span className="font-mono text-xs text-slate-400">{run.id.slice(0, 8)}</span>
-                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-600">
+                      <span className="font-mono text-xs text-gray-500 dark:text-gray-400">{run.id.slice(0, 8)}</span>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
                         <GitBranch size={10} />{run.branch || 'main'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-500">{run.passed_tests}/{run.total_tests}</span>
+                      <span className="text-[11px] text-gray-500 dark:text-gray-400">{run.passed_tests}/{run.total_tests}</span>
                       <StatusBadge status={run.status} />
                     </div>
                   </button>

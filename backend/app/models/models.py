@@ -18,7 +18,8 @@ def now_utc():
 
 class UserRole(str, enum.Enum):
     admin = "admin"
-    developer = "developer"
+    automation_lead = "automation_lead"
+    automation_user = "automation_user"
     viewer = "viewer"
 
 
@@ -52,7 +53,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255))
-    role = Column(Enum(UserRole), default=UserRole.developer, nullable=False)
+    role = Column(Enum(UserRole), default=UserRole.automation_user, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), default=now_utc)
 

@@ -112,9 +112,13 @@ interface AppState {
   refreshProjectData: (projectId: string) => Promise<void>
   loadRunDetails: (runId: string) => Promise<void>
   createProject: () => Promise<void>
+  deleteProject: (projectId: string) => Promise<void>
   createSuite: () => Promise<void>
+  deleteSuite: (suiteId: string) => Promise<void>
   createRun: () => Promise<void>
   executeRun: () => Promise<void>
+  cancelRun: (runId: string) => Promise<void>
+  deleteRun: (runId: string) => Promise<void>
   saveScheduler: (suiteId: string) => Promise<void>
   saveNotifications: () => Promise<void>
   computeFlakyTests: () => Promise<void>
@@ -341,6 +345,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  deleteProject: async (projectId) => {
+    try {
+      await apiService.deleteProject(projectId)
+      set(s => {
+        const remaining = s.projects.filter(p => p.id !== projectId)
+        const nextId = s.selectedProjectId === projectId ? (remaining[0]?.id ?? null) : s.selectedProjectId
+        return {
+          projects: remaining,
+          selectedProjectId: nextId,
+          suites: s.selectedProjectId === projectId ? [] : s.suites,
+          runs: s.selectedProjectId === projectId ? [] : s.runs,
+          selectedSuiteId: s.selectedProjectId === projectId ? null : s.selectedSuiteId,
+          selectedRunId: s.selectedProjectId === projectId ? null : s.selectedRunId,
+          selectedRunDetails: s.selectedProjectId === projectId ? null : s.selectedRunDetails,
+        }
+      })
+    } catch (e) {
+      set({ error: apiService.errorMessage(e) })
+    }
+  },
+
   createSuite: async () => {
     const { selectedProjectId, suiteForm } = get()
     if (!selectedProjectId) return
@@ -351,6 +376,20 @@ export const useAppStore = create<AppState>((set, get) => ({
         suites: [s, ...prev.suites],
         selectedSuiteId: s.id,
         suiteForm: { name: '', tags: '' },
+      }))
+    } catch (e) {
+      set({ error: apiService.errorMessage(e) })
+    }
+  },
+
+  deleteSuite: async (suiteId) => {
+    try {
+      await apiService.deleteSuite(suiteId)
+      set(s => ({
+        suites: s.suites.filter(suite => suite.id !== suiteId),
+        selectedSuiteId: s.selectedSuiteId === suiteId ? (s.suites.find(suite => suite.id !== suiteId)?.id ?? null) : s.selectedSuiteId,
+        runs: s.selectedSuiteId === suiteId ? [] : s.runs,
+        selectedRunId: s.selectedSuiteId === suiteId ? null : s.selectedRunId,
       }))
     } catch (e) {
       set({ error: apiService.errorMessage(e) })
@@ -384,6 +423,40 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().refreshProjectData(selectedProjectId)
       const d = await apiService.getRunDetails(selectedRunId)
       set({ selectedRunDetails: d })
+    } catch (e) {
+      set({ error: apiService.errorMessage(e) })
+    }
+  },
+
+  cancelRun: async (runId) => {
+    const { selectedProjectId } = get()
+    try {
+      await apiService.cancelRun(runId)
+      set(s => ({
+        runs: s.runs.map(r => r.id === runId ? { ...r, status: 'cancelled' as const } : r),
+        selectedRunDetails: s.selectedRunDetails?.id === runId
+          ? { ...s.selectedRunDetails, status: 'cancelled' as const }
+          : s.selectedRunDetails,
+      }))
+      if (selectedProjectId) await get().refreshProjectData(selectedProjectId)
+    } catch (e) {
+      set({ error: apiService.errorMessage(e) })
+    }
+  },
+
+  deleteRun: async (runId) => {
+    const { selectedProjectId } = get()
+    try {
+      await apiService.deleteRun(runId)
+      set(s => {
+        const remaining = s.runs.filter(r => r.id !== runId)
+        return {
+          runs: remaining,
+          selectedRunId: s.selectedRunId === runId ? (remaining[0]?.id ?? null) : s.selectedRunId,
+          selectedRunDetails: s.selectedRunDetails?.id === runId ? null : s.selectedRunDetails,
+        }
+      })
+      if (selectedProjectId) await get().refreshProjectData(selectedProjectId)
     } catch (e) {
       set({ error: apiService.errorMessage(e) })
     }

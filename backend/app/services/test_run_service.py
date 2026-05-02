@@ -56,6 +56,29 @@ class TestRunService:
         return result.scalars().all()
 
     @staticmethod
+    async def cancel_run(db: AsyncSession, run_id: str) -> Optional[TestRun]:
+        """Cancel a running or pending run."""
+        run = await TestRunService.get_run(db, run_id)
+        if not run:
+            return None
+        if run.status in (RunStatus.running, RunStatus.pending):
+            run.status = RunStatus.cancelled
+            run.finished_at = datetime.now(timezone.utc)
+            await db.commit()
+            await db.refresh(run)
+        return run
+
+    @staticmethod
+    async def delete_run(db: AsyncSession, run_id: str) -> bool:
+        """Delete a run and all its results/artifacts."""
+        run = await TestRunService.get_run(db, run_id)
+        if not run:
+            return False
+        await db.delete(run)
+        await db.commit()
+        return True
+
+    @staticmethod
     async def execute_test_run(
         db: AsyncSession,
         run_id: uuid.UUID,

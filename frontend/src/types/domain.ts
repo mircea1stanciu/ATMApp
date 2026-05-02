@@ -1,3 +1,34 @@
+export type UserRole = 'admin' | 'automation_lead' | 'automation_user' | 'viewer'
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  admin: 'Admin',
+  automation_lead: 'Automation Lead',
+  automation_user: 'Automation User',
+  viewer: 'Viewer',
+}
+
+export const ROLE_COLORS: Record<UserRole, string> = {
+  admin: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
+  automation_lead: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+  automation_user: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
+  viewer: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400',
+}
+
+/** Roles allowed to access each route. Absence = all authenticated users. */
+export const ROUTE_ROLES: Record<string, UserRole[]> = {
+  '/projects': ['admin', 'automation_lead'],
+  '/runs':     ['admin', 'automation_lead', 'automation_user'],
+  '/analytics':['admin', 'automation_lead', 'automation_user', 'viewer'],
+  '/users':    ['admin'],
+  '/settings': ['admin', 'automation_lead'],
+}
+
+export function canAccess(role: UserRole | string | undefined, path: string): boolean {
+  const allowed = ROUTE_ROLES[path]
+  if (!allowed) return true           // dashboard and other open pages
+  return allowed.includes(role as UserRole)
+}
+
 export type RunStatus =
   | 'pending'
   | 'running'
@@ -46,6 +77,15 @@ export interface Project {
   framework: string | null
   config_json: ProjectConfig | null
   created_at: string
+}
+
+export interface GitHubTreeItem {
+  name: string
+  path: string
+  type: 'file' | 'dir'
+  size?: number
+  sha: string
+  download_url?: string | null
 }
 
 export interface TestSuite {
