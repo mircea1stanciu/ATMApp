@@ -1,27 +1,39 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from datetime import datetime, timezone
-import uuid
-from uuid import UUID
 from typing import Optional
 
-# Import from core.database instead of app.models
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 from core.database import User, UserRole as CoreUserRole
 
 from app.core.security import verify_password, get_password_hash
 from app.schemas.auth import UserCreate, UserLogin
 
 
+def _normalize_role(role: str) -> CoreUserRole:
+    role_aliases = {
+        "super_admin": CoreUserRole.SUPER_ADMIN,
+        "admin": CoreUserRole.ADMIN,
+        "org_admin": CoreUserRole.ORG_ADMIN,
+        "community_lead": CoreUserRole.COMMUNITY_LEAD,
+        "automation_lead": CoreUserRole.AUTOMATION_LEAD,
+        "automation_user": CoreUserRole.AUTOMATION_USER,
+        "developer": CoreUserRole.AUTOMATION_USER,
+        "viewer": CoreUserRole.VIEWER,
+        "user": CoreUserRole.USER,
+    }
+
+    normalized_role = role_aliases.get(role.lower())
+    if normalized_role is None:
+        raise ValueError(f"Unsupported role: {role}")
+    return normalized_role
+
+
 class AuthService:
     @staticmethod
     async def register_user(db: AsyncSession, user_data: UserCreate) -> User:
         """Register a new user."""
-        # Check if user already exists
-        stmt = select(User).where(User.email == user_data.email)
+        # Check if user already exists - use exists() to avoid loading all columns
+        stmt = select(User.email).where(User.email == user_data.email).limit(1)
         result = await db.execute(stmt)
         if result.scalars().first():
             raise ValueError(f"User with email {user_data.email} already exists")
@@ -31,7 +43,8 @@ class AuthService:
             email=user_data.email,
             hashed_password=get_password_hash(user_data.password),
             full_name=user_data.full_name,
-            role=CoreUserRole.USER,  # Maps to 'automation_user' in the app
+            username=user_data.email.split('@')[0],
+            role=CoreUserRole.USER,
             is_active=True,
         )
         db.add(user)
@@ -39,9 +52,11 @@ class AuthService:
             await db.commit()
             await db.refresh(user)
             return user
-        except IntegrityError:
+        except IntegrityError as e:
             await db.rollback()
-            raise ValueError(f"User with email {user_data.email} already exists")
+            if "email" in str(e).lower():
+                raise ValueError(f"User with email {user_data.email} already exists")
+            raise ValueError(f"Database error: {str(e)}")
 
     @staticmethod
     async def create_user(
@@ -54,27 +69,20 @@ class AuthService:
         is_active: bool = True,
     ) -> User:
         """Create a new user with specified role (admin only)."""
-        # Check if user already exists
-        stmt = select(User).where(User.email == email)
+        # Check if user already exists - use exists() to avoid loading all columns
+        stmt = select(User.email).where(User.email == email).limit(1)
         result = await db.execute(stmt)
         if result.scalars().first():
             raise ValueError(f"User with email {email} already exists")
         
-        # Map string role to CoreUserRole enum
-        role_map = {
-            "super_admin": CoreUserRole.SUPER_ADMIN,
-            "org_admin": CoreUserRole.ORG_ADMIN,
-            "community_lead": CoreUserRole.COMMUNITY_LEAD,
-            "user": CoreUserRole.USER,
-        }
-        
-        user_role = role_map.get(role, CoreUserRole.USER)
+        user_role = _normalize_role(role)
         
         # Create new user
         user = User(
             email=email,
             hashed_password=get_password_hash(password),
             full_name=full_name,
+            username=email.split('@')[0],
             role=user_role,
             is_active=is_active,
             assigned_lead_id=int(assigned_lead_id) if assigned_lead_id else None,
@@ -86,7 +94,7 @@ class AuthService:
             return user
         except IntegrityError as e:
             await db.rollback()
-            if "email" in str(e).lower():
+            if "email" in str(e).lower() or "unique" in str(e).lower():
                 raise ValueError(f"User with email {email} already exists")
             raise ValueError(f"Database error: {str(e)}")
 
@@ -117,11 +125,11 @@ class AuthService:
         return result.scalars().first()
 
     @staticmethod
-    async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
-        """Get user by email."""
-        stmt = select(User).where(User.email == email)
+    async def get_user_by_email(db: AsyncSession, email: str) -> Optional[bool]:
+        """Check if user exists by email."""
+        stmt = select(User.email).where(User.email == email).limit(1)
         result = await db.execute(stmt)
-        return result.scalars().first()
+        return result.scalars().first() is not None
 
     @staticmethod
     async def list_users(db: AsyncSession) -> list[User]:
@@ -142,7 +150,7 @@ class AuthService:
         password: Optional[str] = None,
     ) -> User:
         """Update a user's profile / role (admin only)."""
-        stmt = select(User).where(User.id == user_id)
+        stmt = select(User).where(User.id == int(user_id))
         result = await db.execute(stmt)
         user = result.scalars().first()
         if not user:
@@ -152,11 +160,11 @@ class AuthService:
         if full_name is not None:
             user.full_name = full_name
         if role is not None:
-            user.role = UserRole(role)
-            if user.role not in {UserRole.automation_user, UserRole.viewer}:
+            user.role = _normalize_role(role)
+            if user.role not in {CoreUserRole.AUTOMATION_USER, CoreUserRole.USER, CoreUserRole.VIEWER}:
                 user.assigned_lead_id = None
         if assigned_lead_id is not None:
-            user.assigned_lead_id = UUID(assigned_lead_id) if assigned_lead_id else None
+            user.assigned_lead_id = int(assigned_lead_id) if assigned_lead_id else None
         if is_active is not None:
             user.is_active = is_active
         if password is not None:
@@ -175,7 +183,7 @@ class AuthService:
     @staticmethod
     async def delete_user(db: AsyncSession, user_id: str) -> bool:
         """Delete a user by id."""
-        stmt = select(User).where(User.id == user_id)
+        stmt = select(User).where(User.id == int(user_id))
         result = await db.execute(stmt)
         user = result.scalars().first()
         if not user:

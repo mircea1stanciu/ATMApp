@@ -964,7 +964,7 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
     
     if register_data.get("role"):
         role_value = register_data["role"].upper()
-        if role_value in ["USER", "COMMUNITY_LEAD"]:
+        if role_value in ["USER", "VIEWER", "COMMUNITY_LEAD"]:
             user_role = UserRole[role_value]
     
     print(f"[REGISTER-USER DEBUG] After role check - user_role: {user_role}, has assigned_communities in payload: {register_data.get('assigned_communities')}")
@@ -972,7 +972,7 @@ async def register_org_user(register_data: dict, db: Session = Depends(get_db)):
     print(f"[REGISTER-USER DEBUG] Condition check: assigned_communities is not empty: {bool(register_data.get('assigned_communities'))}")
     
     # Handle community assignments for community leads and regular users
-    if (user_role == UserRole.COMMUNITY_LEAD or user_role == UserRole.USER) and register_data.get("assigned_communities"):
+    if (user_role == UserRole.COMMUNITY_LEAD or user_role in {UserRole.USER, UserRole.VIEWER}) and register_data.get("assigned_communities"):
         import json
         assigned_communities = json.dumps(register_data["assigned_communities"])
         print(f"[REGISTER-USER DEBUG] ✅ Entering community assignment block")
@@ -1759,11 +1759,11 @@ async def create_organization_user(
         # Super admins and org admins can specify role
         if user_data.get("role"):
             role_value = user_data["role"].upper()
-            if role_value in ["ORG_ADMIN", "COMMUNITY_LEAD", "USER"]:
+            if role_value in ["ORG_ADMIN", "COMMUNITY_LEAD", "USER", "VIEWER"]:
                 user_role = UserRole[role_value]
         
         # Handle community assignments for community leads and regular users
-        if (user_role == UserRole.COMMUNITY_LEAD or user_role == UserRole.USER) and user_data.get("assigned_communities"):
+        if (user_role == UserRole.COMMUNITY_LEAD or user_role in {UserRole.USER, UserRole.VIEWER}) and user_data.get("assigned_communities"):
             import json
             assigned_communities = json.dumps(user_data["assigned_communities"])
         
@@ -1846,7 +1846,7 @@ async def update_organization_user(
         
         # Update assigned communities for community leads and regular users
         if user_data.get("assigned_communities") is not None:
-            if user.role == UserRole.COMMUNITY_LEAD or user.role == UserRole.USER:
+            if user.role == UserRole.COMMUNITY_LEAD or user.role in {UserRole.USER, UserRole.VIEWER}:
                 import json
                 user.assigned_communities = json.dumps(user_data["assigned_communities"])
             else:

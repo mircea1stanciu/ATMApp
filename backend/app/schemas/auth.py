@@ -46,6 +46,8 @@ class UserResponse(BaseModel):
     email: str
     full_name: Optional[str] = None
     role: str
+    assigned_lead_id: Optional[str] = None
+    assigned_lead_name: Optional[str] = None
     is_active: bool
     created_at: datetime
     assigned_communities: Optional[list] = None

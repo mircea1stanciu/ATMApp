@@ -184,12 +184,15 @@ def require_role(*roles: CoreUserRole):
         return current_user
     return _check
 
-require_admin = require_role(CoreUserRole.SUPER_ADMIN, CoreUserRole.ORG_ADMIN)
-require_lead_or_above = require_role(CoreUserRole.SUPER_ADMIN, CoreUserRole.ORG_ADMIN, CoreUserRole.COMMUNITY_LEAD)
+require_admin = require_role(CoreUserRole.SUPER_ADMIN, CoreUserRole.ADMIN, CoreUserRole.ORG_ADMIN)
+require_lead_or_above = require_role(CoreUserRole.SUPER_ADMIN, CoreUserRole.ADMIN, CoreUserRole.ORG_ADMIN, CoreUserRole.COMMUNITY_LEAD, CoreUserRole.AUTOMATION_LEAD)
 require_user_or_above = require_role(
     CoreUserRole.SUPER_ADMIN,
+    CoreUserRole.ADMIN,
     CoreUserRole.ORG_ADMIN,
     CoreUserRole.COMMUNITY_LEAD,
+    CoreUserRole.AUTOMATION_LEAD,
+    CoreUserRole.AUTOMATION_USER,
     CoreUserRole.USER,
 )
 
@@ -230,8 +233,18 @@ async def list_users(
     # Get manager role value
     manager_role_value = manager.role.value if hasattr(manager.role, 'value') else str(manager.role)
     
-    # Super admins see all users; automation leads see filtered list
-    if manager_role_value != "super_admin" and manager_role_value == "automation_lead":
+    # Filter users based on manager role
+    if manager_role_value == "super_admin":
+        # Super admins see all users
+        pass
+    elif manager_role_value == "admin":
+        # Admins cannot see super_admin users
+        users = [u for u in users if (u.role.value if hasattr(u.role, 'value') else str(u.role)) != "super_admin"]
+    elif manager_role_value == "org_admin":
+        # Org admins cannot see admin and super_admin users
+        users = [u for u in users if (u.role.value if hasattr(u.role, 'value') else str(u.role)) not in {"admin", "super_admin"}]
+    elif manager_role_value == "automation_lead":
+        # Automation leads see only their own and unassigned automation_user/viewer
         manager_id = str(manager.id)
         users = [
             u for u in users
@@ -268,7 +281,7 @@ async def list_users(
             email=u.email,
             full_name=u.full_name,
             role=u.role.value if hasattr(u.role, 'value') else str(u.role),
-            assigned_lead_id=getattr(u, 'assigned_lead_id', None),
+            assigned_lead_id=str(getattr(u, 'assigned_lead_id', None)) if getattr(u, 'assigned_lead_id', None) is not None else None,
             assigned_lead_name=(
                 users_by_id[str(getattr(u, 'assigned_lead_id', None))].full_name
                 or users_by_id[str(getattr(u, 'assigned_lead_id', None))].email
@@ -358,7 +371,7 @@ async def create_user(
         email=user.email,
         full_name=user.full_name,
         role=user.role.value if hasattr(user.role, 'value') else str(user.role),
-        assigned_lead_id=getattr(user, 'assigned_lead_id', None),
+        assigned_lead_id=str(getattr(user, 'assigned_lead_id', None)) if getattr(user, 'assigned_lead_id', None) is not None else None,
         assigned_lead_name=assigned_lead_name,
         is_active=user.is_active,
         created_at=user.created_at.isoformat(),
@@ -388,11 +401,14 @@ async def update_user(
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+    effective_role_value = (
+        body.role if body.role is not None else (target_user.role.value if hasattr(target_user.role, 'value') else str(target_user.role))
+    )
+
     # Super admins bypass all checks
     if manager_role_value != "super_admin":
         if body.assigned_lead_id:
-            target_role_value = target_user.role.value if hasattr(target_user.role, 'value') else str(target_user.role)
-            if target_role_value not in {"automation_user", "viewer"}:
+            if effective_role_value not in {"automation_user", "viewer"}:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Only Automation User and Viewer accounts can be assigned to an Automation Lead",
@@ -407,8 +423,7 @@ async def update_user(
 
     if manager_role_value == "automation_lead":
         # Leads can only manage assignment for automation users and viewers.
-        target_role_value = target_user.role.value if hasattr(target_user.role, 'value') else str(target_user.role)
-        if target_role_value not in {"automation_user", "viewer"}:
+        if effective_role_value not in {"automation_user", "viewer"}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Automation Leads can assign only Automation User or Viewer accounts",
@@ -457,7 +472,7 @@ async def update_user(
         email=user.email,
         full_name=user.full_name,
         role=user.role.value if hasattr(user.role, 'value') else str(user.role),
-        assigned_lead_id=getattr(user, 'assigned_lead_id', None),
+        assigned_lead_id=str(getattr(user, 'assigned_lead_id', None)) if getattr(user, 'assigned_lead_id', None) is not None else None,
         assigned_lead_name=assigned_lead_name,
         is_active=user.is_active,
         created_at=user.created_at.isoformat(),

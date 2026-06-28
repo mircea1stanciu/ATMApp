@@ -39,9 +39,13 @@ def simple_verify_password(password: str, hashed: str) -> bool:
 class UserRole(enum.Enum):
     """User role enumeration"""
     SUPER_ADMIN = "super_admin"      # Platform administrator
+    ADMIN = "admin"                  # Administrator
     ORG_ADMIN = "org_admin"          # Organization administrator
     COMMUNITY_LEAD = "community_lead"  # Community leader/moderator
+    AUTOMATION_LEAD = "automation_lead"  # Automation workflow lead
+    AUTOMATION_USER = "automation_user"  # Automation workflow user
     USER = "user"                    # Regular user
+    VIEWER = "viewer"                # Read-only user
 
 
 class SubscriptionPlan(enum.Enum):
@@ -164,10 +168,22 @@ class User(Base):
     def verify_password(self, password: str) -> bool:
         """Verify password against hash"""
         try:
+            import hashlib
+            # Try pre-hashed method first (new way: SHA-256 pre-hash + bcrypt)
+            prehashed = hashlib.sha256(password.encode("utf-8")).hexdigest()
+            if pwd_context.verify(prehashed, self.hashed_password):
+                return True
+        except:
+            pass
+        
+        try:
+            # Try direct bcrypt verification (old way, for backward compatibility)
             return pwd_context.verify(password, self.hashed_password)
         except:
-            # Fallback to simple hash verification
-            return simple_verify_password(password, self.hashed_password)
+            pass
+        
+        # Fallback to simple hash verification
+        return simple_verify_password(password, self.hashed_password)
 
     @staticmethod
     def hash_password(password: str) -> str:

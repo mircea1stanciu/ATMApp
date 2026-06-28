@@ -344,16 +344,16 @@ export default function UsersPage() {
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.18 }}
               onClick={e => e.stopPropagation()}
-              className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-2xl"
+              className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xl flex flex-col max-h-[90vh]"
             >
-              <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4 shrink-0">
                 <h2 className="text-base font-bold text-gray-900 dark:text-white">Edit User</h2>
                 <button onClick={() => setEditState(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-white">
                   <X size={16} />
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="overflow-y-auto flex-1 space-y-4 px-6 py-4">
                 {isAdmin && (
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Email</label>
@@ -454,14 +454,14 @@ export default function UsersPage() {
                     <AlertCircle size={14} /> {error}
                   </div>
                 )}
+              </div>
 
-                <div className="flex justify-end gap-3 pt-1">
-                  <button onClick={() => setEditState(null)} className="btn-ghost">Cancel</button>
-                  <button onClick={handleSave} disabled={saving} className="btn-primary">
-                    {saving && <Loader2 size={14} className="animate-spin" />}
-                    {saving ? 'Saving...' : (isAdmin ? 'Save changes' : 'Save assignment')}
-                  </button>
-                </div>
+              <div className="shrink-0 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 px-6 py-4">
+                <button onClick={() => setEditState(null)} className="btn-ghost">Cancel</button>
+                <button onClick={handleSave} disabled={saving} className="btn-primary">
+                  {saving && <Loader2 size={14} className="animate-spin" />}
+                  {saving ? 'Saving...' : (isAdmin ? 'Save changes' : 'Save assignment')}
+                </button>
               </div>
             </motion.div>
           </motion.div>
