@@ -77,13 +77,9 @@ function extractErrorMessage(error: unknown): string {
 
 export const apiService = {
   async login(email: string, password: string): Promise<TokenResponse> {
-    const body = new URLSearchParams()
-    body.set('username', email)
-    body.set('password', password)
-    const response = await api.post<TokenResponse>('/auth/login', body, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+    const response = await api.post<TokenResponse>('/auth/login', {
+      email,
+      password,
     })
     return response.data
   },
@@ -208,6 +204,11 @@ export const apiService = {
   // Admin: user management
   async listUsers(): Promise<UserResponse[]> {
     const response = await api.get<UserResponse[]>('/auth/users')
+    return response.data
+  },
+
+  async createUser(payload: { email: string; password: string; full_name: string; role: string }): Promise<UserResponse> {
+    const response = await api.post<UserResponse>('/auth/users', payload)
     return response.data
   },
 

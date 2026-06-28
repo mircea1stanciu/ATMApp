@@ -4,16 +4,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr
+import json
 
 from app.db.session import get_db
 from app.core.security import (
     create_access_token, create_refresh_token, decode_token
 )
 from app.schemas.auth import (
-    UserCreate, TokenResponse, RefreshTokenRequest, UserResponse
+    UserCreate, TokenResponse, RefreshTokenRequest, UserResponse, LoginRequest, AdminCreateUser
 )
 from app.services import AuthService
-from app.models.models import UserRole
+from app.models.models import UserRole as AppUserRole
+from core.database import UserRole as CoreUserRole
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -72,11 +74,11 @@ async def register(
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    credentials: LoginRequest,
     db: AsyncSession = Depends(get_db)
 ):
     """Login with email and password."""
-    user = await AuthService.authenticate_user(db, form_data.username, form_data.password)
+    user = await AuthService.authenticate_user(db, credentials.email, credentials.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -120,6 +122,31 @@ async def get_current_user_info(
     current_user = Depends(get_current_user)
 ):
     """Get current authenticated user info."""
+    import json
+    
+    # Parse assigned_communities from JSON string
+    assigned_communities = None
+    if hasattr(current_user, 'assigned_communities') and current_user.assigned_communities:
+        try:
+            assigned_communities = json.loads(current_user.assigned_communities)
+        except:
+            assigned_communities = []
+    
+    # Format organization data (handle lazy loading issues in async context)
+    organization_data = None
+    try:
+        if hasattr(current_user, 'organization') and current_user.organization:
+            org = current_user.organization
+            organization_data = {
+                "id": org.id,
+                "name": org.name,
+                "slug": org.slug,
+                "subscription_plan": org.subscription_plan.value if hasattr(org.subscription_plan, 'value') else str(org.subscription_plan),
+            }
+    except Exception:
+        # If organization can't be loaded (lazy loading issue), just skip it
+        pass
+    
     return UserResponse(
         id=str(current_user.id),
         email=current_user.email,
@@ -127,6 +154,8 @@ async def get_current_user_info(
         role=current_user.role.value,
         is_active=current_user.is_active,
         created_at=current_user.created_at.isoformat(),
+        assigned_communities=assigned_communities,
+        organization=organization_data,
     )
 
 
@@ -134,10 +163,20 @@ async def get_current_user_info(
 # Permission helpers
 # ---------------------------------------------------------------------------
 
-def require_role(*roles: UserRole):
+def require_role(*roles: CoreUserRole):
     """Dependency factory: raise 403 if current user's role is not in allowed roles."""
     async def _check(current_user=Depends(get_current_user)):
-        if current_user.role not in roles:
+        # Get the role value as string (handles both UserRole enums)
+        user_role_value = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+        
+        # Super admins have access to everything
+        if user_role_value == "super_admin":
+            return current_user
+        
+        # Convert allowed roles to string values for comparison
+        allowed_role_values = [r.value if hasattr(r, 'value') else str(r) for r in roles]
+        
+        if user_role_value not in allowed_role_values:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient permissions for this action",
@@ -145,19 +184,28 @@ def require_role(*roles: UserRole):
         return current_user
     return _check
 
-require_admin = require_role(UserRole.admin)
-require_lead_or_above = require_role(UserRole.admin, UserRole.automation_lead)
+require_admin = require_role(CoreUserRole.SUPER_ADMIN, CoreUserRole.ORG_ADMIN)
+require_lead_or_above = require_role(CoreUserRole.SUPER_ADMIN, CoreUserRole.ORG_ADMIN, CoreUserRole.COMMUNITY_LEAD)
 require_user_or_above = require_role(
-    UserRole.admin,
-    UserRole.automation_lead,
-    UserRole.automation_user,
-    UserRole.developer,
+    CoreUserRole.SUPER_ADMIN,
+    CoreUserRole.ORG_ADMIN,
+    CoreUserRole.COMMUNITY_LEAD,
+    CoreUserRole.USER,
 )
 
 
 # ---------------------------------------------------------------------------
 # Admin: user management
 # ---------------------------------------------------------------------------
+
+class UserCreateRequest(BaseModel):
+    email: EmailStr
+    full_name: str
+    password: str
+    role: str = "automation_user"
+    assigned_lead_id: Optional[str] = None
+    is_active: bool = True
+
 
 class UserUpdateRequest(BaseModel):
     email: Optional[EmailStr] = None
@@ -168,7 +216,7 @@ class UserUpdateRequest(BaseModel):
     password: Optional[str] = None
 
 
-VALID_ROLES = [r.value for r in UserRole]
+VALID_ROLES = [r.value for r in AppUserRole] + [r.value for r in CoreUserRole]
 
 
 @router.get("/users", response_model=List[UserResponse])
@@ -179,39 +227,144 @@ async def list_users(
     """[Admin/Automation Lead] List users for management and lead assignments."""
     users = await AuthService.list_users(db)
 
-    if manager.role == UserRole.automation_lead:
+    # Get manager role value
+    manager_role_value = manager.role.value if hasattr(manager.role, 'value') else str(manager.role)
+    
+    # Super admins see all users; automation leads see filtered list
+    if manager_role_value != "super_admin" and manager_role_value == "automation_lead":
         manager_id = str(manager.id)
         users = [
             u for u in users
             if (
                 str(u.id) == manager_id
-                or str(u.assigned_lead_id or "") == manager_id
+                or str(getattr(u, 'assigned_lead_id', None) or "") == manager_id
                 or (
-                    u.role in {UserRole.automation_user, UserRole.viewer}
-                    and u.assigned_lead_id is None
+                    hasattr(u.role, 'value') and u.role.value in {"automation_user", "viewer"}
+                    and getattr(u, 'assigned_lead_id', None) is None
                 )
             )
         ]
 
     users_by_id = {str(u.id): u for u in users}
+    
+    # Helper to safely extract organization data
+    def get_org_data(user):
+        try:
+            if hasattr(user, 'organization') and user.organization:
+                org = user.organization
+                return {
+                    "id": org.id,
+                    "name": org.name,
+                    "slug": org.slug,
+                    "subscription_plan": org.subscription_plan.value if hasattr(org.subscription_plan, 'value') else str(org.subscription_plan),
+                }
+        except Exception:
+            pass
+        return None
+    
     return [
         UserResponse(
             id=str(u.id),
             email=u.email,
             full_name=u.full_name,
-            role=u.role.value,
-            assigned_lead_id=u.assigned_lead_id,
+            role=u.role.value if hasattr(u.role, 'value') else str(u.role),
+            assigned_lead_id=getattr(u, 'assigned_lead_id', None),
             assigned_lead_name=(
-                users_by_id[str(u.assigned_lead_id)].full_name
-                or users_by_id[str(u.assigned_lead_id)].email
+                users_by_id[str(getattr(u, 'assigned_lead_id', None))].full_name
+                or users_by_id[str(getattr(u, 'assigned_lead_id', None))].email
             )
-            if u.assigned_lead_id and str(u.assigned_lead_id) in users_by_id
+            if getattr(u, 'assigned_lead_id', None) and str(getattr(u, 'assigned_lead_id', None)) in users_by_id
             else None,
             is_active=u.is_active,
             created_at=u.created_at.isoformat(),
+            assigned_communities=json.loads(u.assigned_communities) if hasattr(u, 'assigned_communities') and u.assigned_communities else None,
+            organization=get_org_data(u),
         )
         for u in users
     ]
+
+
+@router.post("/users", response_model=UserResponse)
+async def create_user(
+    body: UserCreateRequest,
+    manager=Depends(require_lead_or_above),
+    db: AsyncSession = Depends(get_db),
+):
+    """[Super Admin Only] Create a new user."""
+    # Get manager role value
+    manager_role_value = manager.role.value if hasattr(manager.role, 'value') else str(manager.role)
+    
+    # Only super_admin can create users
+    if manager_role_value != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only super_admin can create new users",
+        )
+    
+    # Validate role
+    if body.role not in VALID_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role. Valid roles: {VALID_ROLES}",
+        )
+    
+    # If assigned_lead_id is provided, validate it
+    if body.assigned_lead_id:
+        if body.role not in {"automation_user", "viewer"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only automation_user and viewer roles can be assigned to an Automation Lead",
+            )
+        assigned_lead = await AuthService.get_user_by_id(db, body.assigned_lead_id)
+        assigned_lead_role = assigned_lead.role.value if hasattr(assigned_lead.role, 'value') else str(assigned_lead.role) if assigned_lead else None
+        if not assigned_lead or assigned_lead_role != "automation_lead":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="assigned_lead_id must reference an existing Automation Lead",
+            )
+    
+    # Check if user already exists
+    existing_user = await AuthService.get_user_by_email(db, body.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User with this email already exists",
+        )
+    
+    try:
+        user = await AuthService.create_user(
+            db,
+            email=body.email,
+            password=body.password,
+            full_name=body.full_name,
+            role=body.role,
+            assigned_lead_id=body.assigned_lead_id,
+            is_active=body.is_active,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    
+    assigned_lead_name = None
+    if getattr(user, 'assigned_lead_id', None):
+        assigned_lead = await AuthService.get_user_by_id(db, str(user.assigned_lead_id))
+        if assigned_lead:
+            assigned_lead_name = assigned_lead.full_name or assigned_lead.email
+    
+    return UserResponse(
+        id=str(user.id),
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role.value if hasattr(user.role, 'value') else str(user.role),
+        assigned_lead_id=getattr(user, 'assigned_lead_id', None),
+        assigned_lead_name=assigned_lead_name,
+        is_active=user.is_active,
+        created_at=user.created_at.isoformat(),
+        assigned_communities=json.loads(user.assigned_communities) if hasattr(user, 'assigned_communities') and user.assigned_communities else None,
+        organization=None,
+    )
 
 
 @router.patch("/users/{user_id}", response_model=UserResponse)
@@ -222,6 +375,9 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
 ):
     """[Admin/Automation Lead] Update a user. Leads can only assign automation users/viewers."""
+    # Get manager role value
+    manager_role_value = manager.role.value if hasattr(manager.role, 'value') else str(manager.role)
+    
     if body.role is not None and body.role not in VALID_ROLES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -232,22 +388,27 @@ async def update_user(
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if body.assigned_lead_id:
-        if target_user.role not in {UserRole.automation_user, UserRole.viewer}:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only Automation User and Viewer accounts can be assigned to an Automation Lead",
-            )
-        assigned_lead = await AuthService.get_user_by_id(db, body.assigned_lead_id)
-        if not assigned_lead or assigned_lead.role != UserRole.automation_lead:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="assigned_lead_id must reference an existing Automation Lead",
-            )
+    # Super admins bypass all checks
+    if manager_role_value != "super_admin":
+        if body.assigned_lead_id:
+            target_role_value = target_user.role.value if hasattr(target_user.role, 'value') else str(target_user.role)
+            if target_role_value not in {"automation_user", "viewer"}:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Only Automation User and Viewer accounts can be assigned to an Automation Lead",
+                )
+            assigned_lead = await AuthService.get_user_by_id(db, body.assigned_lead_id)
+            assigned_lead_role = assigned_lead.role.value if hasattr(assigned_lead.role, 'value') else str(assigned_lead.role)
+            if not assigned_lead or assigned_lead_role != "automation_lead":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="assigned_lead_id must reference an existing Automation Lead",
+                )
 
-    if manager.role == UserRole.automation_lead:
+    if manager_role_value == "automation_lead":
         # Leads can only manage assignment for automation users and viewers.
-        if target_user.role not in {UserRole.automation_user, UserRole.viewer}:
+        target_role_value = target_user.role.value if hasattr(target_user.role, 'value') else str(target_user.role)
+        if target_role_value not in {"automation_user", "viewer"}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Automation Leads can assign only Automation User or Viewer accounts",
@@ -286,7 +447,7 @@ async def update_user(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     assigned_lead_name = None
-    if user.assigned_lead_id:
+    if getattr(user, 'assigned_lead_id', None):
         assigned_lead = await AuthService.get_user_by_id(db, str(user.assigned_lead_id))
         if assigned_lead:
             assigned_lead_name = assigned_lead.full_name or assigned_lead.email
@@ -295,11 +456,13 @@ async def update_user(
         id=str(user.id),
         email=user.email,
         full_name=user.full_name,
-        role=user.role.value,
-        assigned_lead_id=user.assigned_lead_id,
+        role=user.role.value if hasattr(user.role, 'value') else str(user.role),
+        assigned_lead_id=getattr(user, 'assigned_lead_id', None),
         assigned_lead_name=assigned_lead_name,
         is_active=user.is_active,
         created_at=user.created_at.isoformat(),
+        assigned_communities=json.loads(user.assigned_communities) if hasattr(user, 'assigned_communities') and user.assigned_communities else None,
+        organization=None,
     )
 
 
@@ -310,6 +473,9 @@ async def delete_user(
     db: AsyncSession = Depends(get_db),
 ):
     """[Admin/Automation Lead] Delete a user with scoped permissions."""
+    # Get manager role value
+    manager_role_value = manager.role.value if hasattr(manager.role, 'value') else str(manager.role)
+    
     target_user = await AuthService.get_user_by_id(db, user_id)
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -320,7 +486,8 @@ async def delete_user(
             detail="You cannot delete your own account",
         )
 
-    if manager.role == UserRole.automation_lead:
+    # Super admins can delete any user (except themselves)
+    if manager_role_value == "automation_lead":
         if not target_user.assigned_lead_id or str(target_user.assigned_lead_id) != str(manager.id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

@@ -1,6 +1,10 @@
-export type UserRole = 'admin' | 'automation_lead' | 'automation_user' | 'viewer'
+export type UserRole = 'super_admin' | 'org_admin' | 'community_lead' | 'user' | 'admin' | 'automation_lead' | 'automation_user' | 'viewer'
 
 export const ROLE_LABELS: Record<UserRole, string> = {
+  super_admin: 'Super Admin',
+  org_admin: 'Organization Admin',
+  community_lead: 'Community Lead',
+  user: 'User',
   admin: 'Admin',
   automation_lead: 'Automation Lead',
   automation_user: 'Automation User',
@@ -8,6 +12,10 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 }
 
 export const ROLE_COLORS: Record<UserRole, string> = {
+  super_admin: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+  org_admin: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
+  community_lead: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
+  user: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
   admin: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
   automation_lead: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
   automation_user: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
@@ -16,15 +24,18 @@ export const ROLE_COLORS: Record<UserRole, string> = {
 
 /** Roles allowed to access each route. Absence = all authenticated users. */
 export const ROUTE_ROLES: Record<string, UserRole[]> = {
-  '/jira-projects': ['admin', 'automation_lead', 'automation_user', 'viewer'],
-  '/projects': ['admin', 'automation_lead', 'automation_user', 'viewer'],
-  '/runs':     ['admin', 'automation_lead', 'automation_user', 'viewer'],
-  '/analytics':['admin', 'automation_lead', 'automation_user', 'viewer'],
-  '/users':    ['admin', 'automation_lead'],
-  '/settings': ['admin', 'automation_lead', 'automation_user', 'viewer'],
+  '/jira-projects': ['super_admin', 'org_admin', 'community_lead', 'user', 'admin', 'automation_lead', 'automation_user', 'viewer'],
+  '/projects': ['super_admin', 'org_admin', 'community_lead', 'user', 'admin', 'automation_lead', 'automation_user', 'viewer'],
+  '/runs':     ['super_admin', 'org_admin', 'community_lead', 'user', 'admin', 'automation_lead', 'automation_user', 'viewer'],
+  '/analytics':['super_admin', 'org_admin', 'community_lead', 'user', 'admin', 'automation_lead', 'automation_user', 'viewer'],
+  '/users':    ['super_admin', 'org_admin', 'admin', 'automation_lead'],
+  '/settings': ['super_admin', 'org_admin', 'community_lead', 'user', 'admin', 'automation_lead', 'automation_user', 'viewer'],
 }
 
 export function canAccess(role: UserRole | string | undefined, path: string): boolean {
+  // Super admin has access to everything
+  if (role === 'super_admin') return true
+  
   const allowed = ROUTE_ROLES[path]
   if (!allowed) return true           // dashboard and other open pages
   const normalizedRole = role === 'developer' ? 'automation_user' : role

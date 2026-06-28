@@ -687,9 +687,9 @@ export default function SettingsPage() {
   const projects = useAppStore(s => s.projects)
   const selectedProjectId = useAppStore(s => s.selectedProjectId)
 
-  const isProjectManager = user?.role === 'admin' || user?.role === 'automation_lead'
+  const isProjectManager = user?.role === 'admin' || user?.role === 'automation_lead' || user?.role === 'super_admin' || user?.role === 'org_admin'
   const canManageJiraProject =
-    user?.role === 'admin' ||
+    user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'org_admin' ||
     user?.role === 'automation_lead' ||
     ((user?.role === 'automation_user' || user?.role === 'viewer') && Boolean(user?.assigned_lead_id))
 

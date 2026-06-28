@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Outlet, useNavigate, NavLink } from 'react-router-dom'
 import {
   Activity, BarChart2, Building2, FolderGit2, Github, LayoutDashboard,
   LogOut, Menu, Moon, Settings, Sun, Users, X, Zap,
@@ -9,6 +9,7 @@ import { ROLE_LABELS, canAccess } from '@/types/domain'
 import type { UserRole } from '@/types/domain'
 import type { JiraProject } from '@/types/domain'
 import { apiService } from '@/services/api'
+import TopNavBar from './TopNavBar'
 
 const NAV = [
   { to: '/',          label: 'Dashboard', icon: LayoutDashboard },
@@ -193,18 +194,25 @@ export default function AppLayout() {
   )
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-[260px] shrink-0 flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 md:flex">
-        {sidebarContent}
-      </aside>
+    <div className="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+      {/* Top Navigation Bar */}
+      <TopNavBar
+        jiraProjects={jiraProjects}
+        activeJiraProjectKey={activeJiraProjectKey}
+        activeGitHubProjectLabel={activeGitHubProjectLabel}
+        hasRunning={hasRunning}
+        isDark={isDark}
+        ghStatus={ghStatus}
+        onThemeToggle={() => setIsDark(d => !d)}
+        onMobileMenuToggle={() => setMobileOpen(true)}
+      />
 
-      {/* Mobile overlay */}
+      {/* Mobile menu button and content */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="relative flex h-full w-[280px] flex-col bg-white dark:bg-gray-900 shadow-2xl">
-            <button onClick={() => setMobileOpen(false)} className="absolute right-3 top-3 rounded-lg p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white">
+          <aside className="relative flex h-full w-[280px] flex-col bg-white dark:bg-gray-900 shadow-2xl overflow-y-auto">
+            <button onClick={() => setMobileOpen(false)} className="absolute right-3 top-3 rounded-lg p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white z-10">
               <X size={18} />
             </button>
             {sidebarContent}
@@ -212,51 +220,11 @@ export default function AppLayout() {
         </div>
       )}
 
-      {/* Main content */}
+      {/* Main content - now full width */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Top header */}
-        <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 shadow-sm">
-          <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-gray-500 hover:text-gray-900 dark:hover:text-white md:hidden">
-            <Menu size={18} />
-          </button>
-          <span className="text-sm font-bold text-gray-900 dark:text-white md:hidden">AutomationTestManager (ATM)</span>
-          <div className="hidden md:flex items-center gap-2 flex-1">
-            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              {NAV.find(n => n.to === location.pathname)?.label ?? 'AutomationTestManager'}
-            </span>
-          </div>
-          <button
-            onClick={() => setIsDark(d => !d)}
-            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all"
-            title="Toggle theme"
-          >
-            {isDark ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
-          {/* GitHub connection indicator */}
-          <div
-            className="flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 select-none"
-            title={
-              ghStatus === 'ok' ? 'GitHub: Connected' :
-              ghStatus === 'error' ? 'GitHub: Connection error' :
-              'GitHub: Not connected'
-            }
-          >
-            <Github size={13} className={
-              ghStatus === 'ok' ? 'text-emerald-500' :
-              ghStatus === 'error' ? 'text-red-500' :
-              'text-gray-400'
-            } />
-            <span className={`h-2 w-2 rounded-full ${
-              ghStatus === 'ok' ? 'bg-emerald-500' :
-              ghStatus === 'error' ? 'bg-red-500' :
-              'bg-gray-400'
-            }`} />
-          </div>
-        </header>
-
         {/* Page content */}
         <main className="flex-1 overflow-hidden p-3 md:p-6">
-          <div className="mx-auto h-full max-w-[1400px]">
+          <div className="mx-auto h-full max-w-full">
             <Outlet />
           </div>
         </main>

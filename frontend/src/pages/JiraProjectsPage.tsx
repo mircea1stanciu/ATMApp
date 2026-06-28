@@ -6,7 +6,7 @@ import type { JiraProject } from '@/types/domain'
 
 export default function JiraProjectsPage() {
   const user = useAppStore(s => s.user)
-  const canEdit = user?.role === 'admin' || user?.role === 'automation_lead'
+  const canEdit = user?.role === 'admin' || user?.role === 'automation_lead' || user?.role === 'super_admin' || user?.role === 'org_admin'
 
   const [baseUrl, setBaseUrl] = useState('')
   const [token, setToken] = useState('')

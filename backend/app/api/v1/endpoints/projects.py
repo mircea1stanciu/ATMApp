@@ -238,9 +238,15 @@ async def list_projects(
     current_user = Depends(get_current_user)
 ):
     """List all projects with pagination."""
-    projects = await ProjectService.list_projects(db, skip=skip, limit=limit)
-    projects = [p for p in projects if _can_view_project(p, current_user)]
-    return [ProjectResponse.model_validate(p) for p in projects]
+    try:
+        projects = await ProjectService.list_projects(db, skip=skip, limit=limit)
+        projects = [p for p in projects if _can_view_project(p, current_user)]
+        return [ProjectResponse.model_validate(p) for p in projects]
+    except Exception as e:
+        # Handle case where projects table doesn't exist (UnifiedWork database schema)
+        if "no such table" in str(e).lower() or "no such column" in str(e).lower():
+            return []
+        raise
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)

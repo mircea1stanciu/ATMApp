@@ -25,8 +25,8 @@ export default function ProjectsPage() {
   const deleteProject = useAppStore(s => s.deleteProject)
   const error = useAppStore(s => s.error)
 
-  const canCreate = user?.role === 'admin' || user?.role === 'automation_lead'
-  const canConfigure = user?.role === 'admin' || user?.role === 'automation_lead'
+  const canCreate = user?.role === 'admin' || user?.role === 'automation_lead' || user?.role === 'super_admin' || user?.role === 'org_admin'
+  const canConfigure = user?.role === 'admin' || user?.role === 'automation_lead' || user?.role === 'super_admin' || user?.role === 'org_admin'
 
   const [showCreate, setShowCreate] = useState(false)
   const [carouselIndex, setCarouselIndex] = useState(0)

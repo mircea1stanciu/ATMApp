@@ -6,7 +6,12 @@ import uuid
 from uuid import UUID
 from typing import Optional
 
-from app.models.models import User, UserRole
+# Import from core.database instead of app.models
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+from core.database import User, UserRole as CoreUserRole
+
 from app.core.security import verify_password, get_password_hash
 from app.schemas.auth import UserCreate, UserLogin
 
@@ -21,13 +26,12 @@ class AuthService:
         if result.scalars().first():
             raise ValueError(f"User with email {user_data.email} already exists")
         
-        # Create new user
+        # Create new user with automation_user role (default registration role)
         user = User(
-            id=uuid.uuid4(),
             email=user_data.email,
             hashed_password=get_password_hash(user_data.password),
             full_name=user_data.full_name,
-            role=UserRole.viewer,
+            role=CoreUserRole.USER,  # Maps to 'automation_user' in the app
             is_active=True,
         )
         db.add(user)
@@ -40,6 +44,53 @@ class AuthService:
             raise ValueError(f"User with email {user_data.email} already exists")
 
     @staticmethod
+    async def create_user(
+        db: AsyncSession,
+        email: str,
+        password: str,
+        full_name: str,
+        role: str,
+        assigned_lead_id: Optional[str] = None,
+        is_active: bool = True,
+    ) -> User:
+        """Create a new user with specified role (admin only)."""
+        # Check if user already exists
+        stmt = select(User).where(User.email == email)
+        result = await db.execute(stmt)
+        if result.scalars().first():
+            raise ValueError(f"User with email {email} already exists")
+        
+        # Map string role to CoreUserRole enum
+        role_map = {
+            "super_admin": CoreUserRole.SUPER_ADMIN,
+            "org_admin": CoreUserRole.ORG_ADMIN,
+            "community_lead": CoreUserRole.COMMUNITY_LEAD,
+            "user": CoreUserRole.USER,
+        }
+        
+        user_role = role_map.get(role, CoreUserRole.USER)
+        
+        # Create new user
+        user = User(
+            email=email,
+            hashed_password=get_password_hash(password),
+            full_name=full_name,
+            role=user_role,
+            is_active=is_active,
+            assigned_lead_id=int(assigned_lead_id) if assigned_lead_id else None,
+        )
+        db.add(user)
+        try:
+            await db.commit()
+            await db.refresh(user)
+            return user
+        except IntegrityError as e:
+            await db.rollback()
+            if "email" in str(e).lower():
+                raise ValueError(f"User with email {email} already exists")
+            raise ValueError(f"Database error: {str(e)}")
+
+    @staticmethod
     async def authenticate_user(db: AsyncSession, email: str, password: str) -> Optional[User]:
         """Authenticate user and return user object if valid credentials."""
         stmt = select(User).where(User.email == email)
@@ -49,7 +100,8 @@ class AuthService:
         if not user:
             return None
         
-        if not verify_password(password, user.hashed_password):
+        # Use the User model's verify_password method
+        if not user.verify_password(password):
             return None
         
         if not user.is_active:
@@ -60,7 +112,7 @@ class AuthService:
     @staticmethod
     async def get_user_by_id(db: AsyncSession, user_id: str) -> Optional[User]:
         """Get user by ID."""
-        stmt = select(User).where(User.id == user_id)
+        stmt = select(User).where(User.id == int(user_id))
         result = await db.execute(stmt)
         return result.scalars().first()
 

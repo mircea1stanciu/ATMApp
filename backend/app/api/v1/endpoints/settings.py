@@ -139,7 +139,8 @@ def _user_settings(user) -> dict:
 
 
 def _set_user_settings(user, data: dict) -> None:
-    user.settings_json = data
+    if hasattr(user, 'settings_json'):
+        user.settings_json = data
 
 
 def _read_setting(user_data: dict, key: str, fallback: str = "") -> str:
@@ -152,7 +153,7 @@ def _can_manage_jira_project_config(user) -> bool:
     if user.role in {UserRole.admin, UserRole.automation_lead}:
         return True
 
-    return user.role in {UserRole.automation_user, UserRole.viewer} and bool(user.assigned_lead_id)
+    return user.role in {UserRole.automation_user, UserRole.viewer} and bool(getattr(user, 'assigned_lead_id', None))
 
 
 def _build_github_user_endpoint(base_url: str) -> str:
@@ -292,10 +293,11 @@ async def get_jira_settings(_user=Depends(get_current_user), db: AsyncSession = 
     # Determine where to read project configuration from
     import logging
     _log = logging.getLogger("settings.jira")
-    _log.warning(f"GET /jira: user={_user.email}, role={_user.role}, assigned_lead_id={_user.assigned_lead_id}")
+    assigned_lead_id = getattr(_user, 'assigned_lead_id', None)
+    _log.warning(f"GET /jira: user={_user.email}, role={_user.role}, assigned_lead_id={assigned_lead_id}")
     config_source_user = _user
-    if _user.role in {UserRole.automation_user, UserRole.viewer} and _user.assigned_lead_id:
-        stmt = select(User).where(User.id == _user.assigned_lead_id)
+    if _user.role in {UserRole.automation_user, UserRole.viewer} and assigned_lead_id:
+        stmt = select(User).where(User.id == assigned_lead_id)
         result = await db.execute(stmt)
         lead = result.scalar_one_or_none()
         _log.warning(f"GET /jira: lead found={lead is not None}, lead_email={lead.email if lead else 'N/A'}")
@@ -365,8 +367,9 @@ async def update_jira_settings(
 
     # For the response, get base_url and project from lead if User/Viewer
     config_source_user = current_user
-    if current_user.role in {UserRole.automation_user, UserRole.viewer} and current_user.assigned_lead_id:
-        stmt = select(User).where(User.id == current_user.assigned_lead_id)
+    assigned_lead_id = getattr(current_user, 'assigned_lead_id', None)
+    if current_user.role in {UserRole.automation_user, UserRole.viewer} and assigned_lead_id:
+        stmt = select(User).where(User.id == assigned_lead_id)
         result = await db.execute(stmt)
         lead = result.scalar_one_or_none()
         if lead:
@@ -395,8 +398,9 @@ async def test_jira_connection(_user=Depends(get_current_user), db: AsyncSession
     """
     # Determine where to read configuration from
     config_source_user = _user
-    if _user.role in {UserRole.automation_user, UserRole.viewer} and _user.assigned_lead_id:
-        stmt = select(User).where(User.id == _user.assigned_lead_id)
+    assigned_lead_id = getattr(_user, 'assigned_lead_id', None)
+    if _user.role in {UserRole.automation_user, UserRole.viewer} and assigned_lead_id:
+        stmt = select(User).where(User.id == assigned_lead_id)
         result = await db.execute(stmt)
         lead = result.scalar_one_or_none()
         if lead:
@@ -456,8 +460,9 @@ async def list_jira_projects(_user=Depends(get_current_user), db: AsyncSession =
 
     # Determine where to read project configuration from
     config_source_user = _user
-    if _user.role in {UserRole.automation_user, UserRole.viewer} and _user.assigned_lead_id:
-        stmt = select(User).where(User.id == _user.assigned_lead_id)
+    assigned_lead_id = getattr(_user, 'assigned_lead_id', None)
+    if _user.role in {UserRole.automation_user, UserRole.viewer} and assigned_lead_id:
+        stmt = select(User).where(User.id == assigned_lead_id)
         result = await db.execute(stmt)
         lead = result.scalar_one_or_none()
         if lead:
@@ -573,8 +578,9 @@ async def get_zephyr_cycles(
     """
     # Determine where to read configuration from
     config_source_user = _user
-    if _user.role in {UserRole.automation_user, UserRole.viewer} and _user.assigned_lead_id:
-        stmt = select(User).where(User.id == _user.assigned_lead_id)
+    assigned_lead_id = getattr(_user, 'assigned_lead_id', None)
+    if _user.role in {UserRole.automation_user, UserRole.viewer} and assigned_lead_id:
+        stmt = select(User).where(User.id == assigned_lead_id)
         result = await db.execute(stmt)
         lead = result.scalar_one_or_none()
         if lead:

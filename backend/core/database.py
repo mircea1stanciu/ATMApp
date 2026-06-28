@@ -113,8 +113,7 @@ class Organization(Base):
         """Get limits based on subscription plan"""
         limits = {
             SubscriptionPlan.FREE: {"users": 10, "chats": 1000},
-            SubscriptionPlan.BASIC: {"users": 20, "chats": 5000},
-            SubscriptionPlan.PREMIUM: {"users": 50, "chats": 25000},
+            SubscriptionPlan.SMALL_BUSINESS: {"users": 20, "chats": 5000},
             SubscriptionPlan.ENTERPRISE: {"users": -1, "chats": -1}  # Unlimited
         }
         return limits.get(self.subscription_plan, limits[SubscriptionPlan.FREE])
@@ -131,6 +130,9 @@ class User(Base):
     full_name = Column(String)
     role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
     is_active = Column(Boolean, default=True)
+    
+    # For automation lead assignment (which lead manages this user)
+    assigned_lead_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     
     # Multi-tenancy
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
@@ -419,7 +421,7 @@ def init_db():
                 name="Demo Company",
                 slug="demo",
                 description="Demo organization for testing UnifiedWork",
-                subscription_plan=SubscriptionPlan.PREMIUM,
+                subscription_plan=SubscriptionPlan.SMALL_BUSINESS,
                 max_users=25,
                 max_chat_sessions=10000,
                 access_token=Organization.generate_access_token(),

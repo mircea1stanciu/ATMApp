@@ -3,34 +3,46 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useSearchParams } from 'react-router-dom'
 import {
   CheckCircle2, Edit2, Loader2, Search, Shield, UserCheck,
-  UserCog, Users, X, Eye, AlertCircle, Trash2, Filter,
+  UserCog, Users, X, Eye, AlertCircle, Trash2, Filter, Plus,
 } from 'lucide-react'
 import { apiService } from '@/services/api'
 import { useAppStore } from '@/store/useAppStore'
 import type { UserResponse, UserRole } from '@/types/domain'
 import { ROLE_LABELS, ROLE_COLORS } from '@/types/domain'
 
-const ALL_ROLES: UserRole[] = ['admin', 'automation_lead', 'automation_user', 'viewer']
+const ALL_ROLES: UserRole[] = ['admin', 'automation_lead', 'automation_user', 'viewer', 'user', 'super_admin', 'org_admin', 'community_lead']
 
 const ROLE_ORDER: Record<UserRole, number> = {
-  admin: 0,
-  automation_lead: 1,
-  automation_user: 2,
-  viewer: 3,
+  super_admin: 0,
+  admin: 1,
+  org_admin: 2,
+  community_lead: 3,
+  automation_lead: 4,
+  automation_user: 5,
+  viewer: 6,
+  user: 7,
 }
 
 const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
+  super_admin: <Shield size={13} />,
   admin: <Shield size={13} />,
+  org_admin: <Shield size={13} />,
+  community_lead: <UserCog size={13} />,
   automation_lead: <UserCog size={13} />,
   automation_user: <UserCheck size={13} />,
   viewer: <Eye size={13} />,
+  user: <Eye size={13} />,
 }
 
 const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
+  super_admin: 'Super admin — full system access',
   admin: 'Full access — manage users, projects, runs and all settings',
+  org_admin: 'Organization admin — manage org users and projects',
+  community_lead: 'Community lead — manage community members',
   automation_lead: 'Configure projects, suites and schedulers; execute runs',
   automation_user: 'Execute test runs; read project and suite details',
   viewer: 'Read-only access to runs, results and analytics',
+  user: 'Registered user — default role for new registrations',
 }
 
 interface EditState {
@@ -66,8 +78,16 @@ export default function UsersPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [successId, setSuccessId] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    role: 'automation_user' as UserRole,
+  })
+  const [creatingUser, setCreatingUser] = useState(false)
 
-  const isAdmin = currentUser?.role === 'admin'
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || currentUser?.role === 'org_admin'
   const isLead = currentUser?.role === 'automation_lead'
   const isManager = isAdmin || isLead
   const visibleRoleFilters = isLead
@@ -193,6 +213,32 @@ export default function UsersPage() {
       setError(apiService.errorMessage(e))
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!createForm.email || !createForm.password || !createForm.full_name) {
+      alert('Please fill in all fields')
+      return
+    }
+
+    setCreatingUser(true)
+    setError(null)
+    try {
+      const newUser = await apiService.createUser({
+        email: createForm.email,
+        password: createForm.password,
+        full_name: createForm.full_name,
+        role: createForm.role,
+      })
+      setUsers(prev => [...prev, newUser])
+      setShowCreateModal(false)
+      setCreateForm({ email: '', password: '', full_name: '', role: 'automation_user' })
+    } catch (e) {
+      setError(apiService.errorMessage(e))
+    } finally {
+      setCreatingUser(false)
     }
   }
 
@@ -428,11 +474,22 @@ export default function UsersPage() {
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">User Management</h1>
           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Manage users and assign Automation User/Viewer accounts to Automation Leads</p>
         </div>
-        <div className="flex items-center gap-2">
-          {loading && <Loader2 size={16} className="animate-spin text-gray-400" />}
-          <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-300">
-            {filtered.length} / {users.length} users
-          </span>
+        <div className="flex items-center gap-3">
+          {currentUser?.role === 'super_admin' && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={16} />
+              Add User
+            </button>
+          )}
+          <div className="flex items-center gap-2">
+            {loading && <Loader2 size={16} className="animate-spin text-gray-400" />}
+            <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+              {filtered.length} / {users.length} users
+            </span>
+          </div>
         </div>
       </div>
 
@@ -658,6 +715,107 @@ export default function UsersPage() {
           )}
         </div>
       </div>
+
+      {/* Create User Modal */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 shadow-xl"
+            >
+              <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Create New User</h2>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateUser} className="space-y-4 px-6 py-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={createForm.full_name}
+                    onChange={e => setCreateForm(f => ({ ...f, full_name: e.target.value }))}
+                    placeholder="John Doe"
+                    className="form-input"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={createForm.email}
+                    onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="john@example.com"
+                    className="form-input"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={createForm.password}
+                    onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
+                    placeholder="••••••••"
+                    className="form-input"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Role</label>
+                  <select
+                    value={createForm.role}
+                    onChange={e => setCreateForm(f => ({ ...f, role: e.target.value as UserRole }))}
+                    className="form-input"
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="automation_lead">Automation Lead</option>
+                    <option value="automation_user">Automation User</option>
+                    <option value="user">User</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/20 px-3 py-2.5 text-sm text-red-700 dark:text-red-300">
+                    <AlertCircle size={14} /> {error}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="btn-ghost"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingUser}
+                    className="btn-primary"
+                  >
+                    {creatingUser && <Loader2 size={14} className="animate-spin" />}
+                    {creatingUser ? 'Creating...' : 'Create User'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
