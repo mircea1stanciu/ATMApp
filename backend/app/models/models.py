@@ -20,6 +20,7 @@ class UserRole(str, enum.Enum):
     admin = "admin"
     automation_lead = "automation_lead"
     automation_user = "automation_user"
+    developer = "developer"
     viewer = "viewer"
 
 
@@ -53,7 +54,9 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255))
-    role = Column(Enum(UserRole), default=UserRole.automation_user, nullable=False)
+    role = Column(Enum(UserRole), default=UserRole.viewer, nullable=False)
+    assigned_lead_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    settings_json = Column(JSON, default=dict, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), default=now_utc)
 
@@ -68,7 +71,7 @@ class Project(Base):
     git_repo_url = Column(String(512), nullable=False)
     git_provider = Column(Enum(GitProvider), default=GitProvider.github)
     default_branch = Column(String(255), default="main")
-    framework = Column(String(100))          # pytest / playwright / cypress / robot
+    framework = Column(String(100))          # pytest / playwright / cypress / robot / bruno
     config_json = Column(JSON, default=dict) # configurare specifică framework
     created_at = Column(DateTime(timezone=True), default=now_utc)
 

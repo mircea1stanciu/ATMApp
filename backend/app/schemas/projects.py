@@ -10,7 +10,7 @@ class ProjectCreate(BaseModel):
     git_repo_url: str
     git_provider: str = "github"  # github, gitlab, bitbucket
     default_branch: str = "main"
-    framework: Optional[str] = None  # pytest, playwright, cypress, robot
+    framework: Optional[str] = None  # pytest, playwright, cypress, robot, bruno
     config_json: Optional[Dict[str, Any]] = None
 
 

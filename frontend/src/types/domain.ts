@@ -16,17 +16,19 @@ export const ROLE_COLORS: Record<UserRole, string> = {
 
 /** Roles allowed to access each route. Absence = all authenticated users. */
 export const ROUTE_ROLES: Record<string, UserRole[]> = {
-  '/projects': ['admin', 'automation_lead'],
-  '/runs':     ['admin', 'automation_lead', 'automation_user'],
+  '/jira-projects': ['admin', 'automation_lead', 'automation_user', 'viewer'],
+  '/projects': ['admin', 'automation_lead', 'automation_user', 'viewer'],
+  '/runs':     ['admin', 'automation_lead', 'automation_user', 'viewer'],
   '/analytics':['admin', 'automation_lead', 'automation_user', 'viewer'],
-  '/users':    ['admin'],
-  '/settings': ['admin', 'automation_lead'],
+  '/users':    ['admin', 'automation_lead'],
+  '/settings': ['admin', 'automation_lead', 'automation_user', 'viewer'],
 }
 
 export function canAccess(role: UserRole | string | undefined, path: string): boolean {
   const allowed = ROUTE_ROLES[path]
   if (!allowed) return true           // dashboard and other open pages
-  return allowed.includes(role as UserRole)
+  const normalizedRole = role === 'developer' ? 'automation_user' : role
+  return allowed.includes(normalizedRole as UserRole)
 }
 
 export type RunStatus =
@@ -49,6 +51,8 @@ export interface UserResponse {
   email: string
   full_name: string | null
   role: string
+  assigned_lead_id?: string | null
+  assigned_lead_name?: string | null
   is_active: boolean
   created_at: string
 }
@@ -86,6 +90,13 @@ export interface GitHubTreeItem {
   size?: number
   sha: string
   download_url?: string | null
+}
+
+export interface JiraProject {
+  id: string
+  key: string
+  name: string
+  project_type?: string | null
 }
 
 export interface TestSuite {

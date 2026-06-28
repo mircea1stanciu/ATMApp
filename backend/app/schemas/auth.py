@@ -32,5 +32,7 @@ class UserResponse(BaseModel):
     email: str
     full_name: Optional[str] = None
     role: str
+    assigned_lead_id: Optional[UUID] = None
+    assigned_lead_name: Optional[str] = None
     is_active: bool
     created_at: datetime

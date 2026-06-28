@@ -23,9 +23,13 @@ interface RunsTabProps {
   setSchedulerDrafts: Dispatch<SetStateAction<SchedulerDrafts>>
   handleSaveScheduler: (suiteId: string) => Promise<void>
   savingSchedulerSuiteId: string | null
-  runBranch: string
-  setRunBranch: (branch: string) => void
-  branches: string[]
+  runProject: string
+  setRunProject: (project: string) => void
+  detectedProjects: string[]
+  projectCollections: Record<string, string[]>
+  runCollection: string
+  setRunCollection: (collection: string) => void
+  collections: string[]
   handleCreateRun: () => Promise<void>
   runs: TestRun[]
   runsByNewest: TestRun[]
@@ -43,7 +47,7 @@ interface RunsTabProps {
 }
 
 const RUNS_SUB_TABS: { id: RunsSubTab; label: string; icon: typeof Terminal }[] = [
-  { id: 'suites', label: 'Suites', icon: Terminal },
+  { id: 'suites', label: 'Projects', icon: Terminal },
   { id: 'executions', label: 'Executions', icon: PlayCircle },
   { id: 'results', label: 'Results', icon: BarChart2 },
 ]
@@ -85,6 +89,12 @@ function escapeCsvValue(value: unknown): string {
   return escaped
 }
 
+function formatCollectionLabel(path: string): string {
+  const parts = path.split('/').filter(Boolean)
+  if (parts.length <= 1) return path
+  return parts.slice(1).join('/')
+}
+
 export default function RunsTab({
   runsSubTab,
   setRunsSubTab,
@@ -99,9 +109,13 @@ export default function RunsTab({
   setSchedulerDrafts,
   handleSaveScheduler,
   savingSchedulerSuiteId,
-  runBranch,
-  setRunBranch,
-  branches,
+  runProject,
+  setRunProject,
+  detectedProjects,
+  projectCollections,
+  runCollection,
+  setRunCollection,
+  collections,
   handleCreateRun,
   runs,
   runsByNewest,
@@ -120,6 +134,7 @@ export default function RunsTab({
   const inputCls = 'form-input'
   const selectCls = 'form-input'
   const [exportingPdf, setExportingPdf] = useState(false)
+  const filteredCollections = runProject ? (projectCollections[runProject] || []) : collections
 
   const handleExportCsv = () => {
     if (!selectedRunDetails) return
@@ -193,12 +208,12 @@ export default function RunsTab({
       {runsSubTab === 'suites' && (
         <div className="space-y-4 content-transition" key="runs-suites">
           <div className="panel-shell max-w-xl">
-            <h3 className="mb-3 section-heading"><span className="section-heading-icon"><Terminal size={14} /></span>New Suite</h3>
+            <h3 className="mb-3 section-heading"><span className="section-heading-icon"><Terminal size={14} /></span>New Project</h3>
             <form onSubmit={e => { void handleCreateSuite(e as FormEvent) }} className="space-y-3">
-              <input className={inputCls} placeholder="Suite Name" value={suiteForm.name} onChange={e => setSuiteForm(p => ({ ...p, name: e.target.value }))} required disabled={!selectedProjectId} />
+              <input className={inputCls} placeholder="Project Name" value={suiteForm.name} onChange={e => setSuiteForm(p => ({ ...p, name: e.target.value }))} required disabled={!selectedProjectId} />
               <input className={inputCls} placeholder="Tags (comma separated)" value={suiteForm.tags} onChange={e => setSuiteForm(p => ({ ...p, tags: e.target.value }))} disabled={!selectedProjectId} />
               <button className="btn-secondary" disabled={!selectedProjectId}>
-                <Plus size={15} /> Add Suite
+                <Plus size={15} /> Add Project
               </button>
             </form>
           </div>
@@ -257,11 +272,15 @@ export default function RunsTab({
             <div className="panel-shell">
               <h3 className="mb-3 section-heading"><span className="section-heading-icon"><PlayCircle size={14} /></span>Create Test Run</h3>
               <div className="flex gap-2">
-                <select value={runBranch} onChange={e => setRunBranch(e.target.value)} className={selectCls}>
-                  {branches.length === 0 && <option value="main">main</option>}
-                  {branches.map(b => <option key={b} value={b}>{b}</option>)}
+                <select value={runProject} onChange={e => setRunProject(e.target.value)} className={selectCls}>
+                  {detectedProjects.length === 0 && <option value="">No projects detected</option>}
+                  {detectedProjects.map(project => <option key={project} value={project}>{project}</option>)}
                 </select>
-                <button onClick={() => void handleCreateRun()} disabled={!selectedSuiteId} className="btn-primary shrink-0">
+                <select value={runCollection} onChange={e => setRunCollection(e.target.value)} className={selectCls}>
+                  {filteredCollections.length === 0 && <option value="">No collections</option>}
+                  {filteredCollections.map(c => <option key={c} value={c}>{formatCollectionLabel(c)}</option>)}
+                </select>
+                <button onClick={() => void handleCreateRun()} disabled={!selectedProjectId || !runCollection} className="btn-primary shrink-0">
                   Run
                 </button>
               </div>

@@ -50,6 +50,12 @@ export function useRunWebSocket({ runId, enabled }: UseRunWebSocketOptions) {
           return next.slice(-300)
         })
       } catch {
+        const rawData = typeof event.data === 'string' ? event.data.trim().toLowerCase() : ''
+        // Ignore websocket heartbeat frames.
+        if (rawData === 'pong' || rawData === 'ping') {
+          return
+        }
+
         setMessages((prev) => [
           ...prev,
           {
@@ -57,7 +63,7 @@ export function useRunWebSocket({ runId, enabled }: UseRunWebSocketOptions) {
             data: event.data,
             timestamp: new Date().toISOString(),
           },
-        ])
+        ].slice(-300))
       }
     }
 
@@ -74,7 +80,31 @@ export function useRunWebSocket({ runId, enabled }: UseRunWebSocketOptions) {
     }
   }, [enabled, runId])
 
-  const groupedText = useMemo(() => {
+  const cliText = useMemo(() => {
+    return messages
+      .map((message) => {
+        const type = (message.type || '').toLowerCase()
+
+        // Keep stdout/stderr output as close as possible to terminal output.
+        if (type === 'stdout' || type === 'stderr' || type === 'raw') {
+          if (typeof message.data === 'string') return message.data
+          if (message.data == null) return ''
+          return JSON.stringify(message.data)
+        }
+
+        if (type === 'status') {
+          return `$ status: ${message.status || ''}`.trimEnd()
+        }
+
+        if (typeof message.data === 'string') return message.data
+        if (message.data == null) return message.status || ''
+        return JSON.stringify(message.data)
+      })
+      .filter(Boolean)
+      .join('\n')
+  }, [messages])
+
+  const structuredText = useMemo(() => {
     return messages
       .map((message) => {
         const time = message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : ''
@@ -86,7 +116,9 @@ export function useRunWebSocket({ runId, enabled }: UseRunWebSocketOptions) {
 
   return {
     messages,
-    groupedText,
+    groupedText: cliText,
+    cliText,
+    structuredText,
     connected,
     connectionError,
     clearMessages: () => setMessages([]),

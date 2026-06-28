@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     GITHUB_TOKEN: str = ""
     GITHUB_MCP_BASE_URL: str = ""  # e.g. https://github.com/org/repo.git
 
+    # Jira MCP
+    JIRA_TOKEN: str = ""
+    JIRA_MCP_BASE_URL: str = ""  # e.g. https://your-domain.atlassian.net
+    JIRA_PROJECT_KEY: str = ""
+    JIRA_PROJECT_NAME: str = ""
+
+    # Zephyr (Jira Test Management)
+    ZEPHYR_PROJECT_KEY: str = ""  # Selected Jira project for Zephyr
+    ZEPHYR_SELECTED_FOLDER_ID: str = ""  # Selected test folder/cycle ID
+
     # Docker runner
     DOCKER_RUNNER_NETWORK: str = "none"
     DOCKER_RUNNER_MEM_LIMIT: str = "512m"

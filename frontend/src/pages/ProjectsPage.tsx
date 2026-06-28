@@ -26,8 +26,10 @@ export default function ProjectsPage() {
   const error = useAppStore(s => s.error)
 
   const canCreate = user?.role === 'admin' || user?.role === 'automation_lead'
+  const canConfigure = user?.role === 'admin' || user?.role === 'automation_lead'
 
   const [showCreate, setShowCreate] = useState(false)
+  const [carouselIndex, setCarouselIndex] = useState(0)
   const [rightTab, setRightTab] = useState<RightTab>('details')
 
   // Repo tree state
@@ -40,7 +42,7 @@ export default function ProjectsPage() {
   // Analyzer state
   const [analyzerLoading, setAnalyzerLoading] = useState(false)
   const [analyzerError, setAnalyzerError] = useState<string | null>(null)
-  const [analyzerResult, setAnalyzerResult] = useState<{ frameworks: string[]; suites: string[]; files_count: number } | null>(null)
+  const [analyzerResult, setAnalyzerResult] = useState<{ frameworks: string[]; projects: { path: string; environments: string[] }[]; files_count: number } | null>(null)
 
   const loadRepoTree = useCallback(async (projectId: string, path: string) => {
     setRepoLoading(true)
@@ -106,6 +108,10 @@ export default function ProjectsPage() {
   }
 
   const selectedProject = projects.find(p => p.id === selectedProjectId) || null
+  const totalSlides = 2
+
+  const goPrevSlide = () => setCarouselIndex(prev => (prev - 1 + totalSlides) % totalSlides)
+  const goNextSlide = () => setCarouselIndex(prev => (prev + 1) % totalSlides)
 
   const handleCreateProject = async (e: FormEvent) => {
     e.preventDefault()
@@ -158,6 +164,7 @@ export default function ProjectsPage() {
                       <option value="playwright">playwright</option>
                       <option value="cypress">cypress</option>
                       <option value="robot">robot</option>
+                      <option value="bruno">bruno</option>
                     </select>
                   </div>
                 </div>
@@ -177,13 +184,34 @@ export default function ProjectsPage() {
         )}
       </AnimatePresence>
 
-      {/* Main grid */}
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[340px_1fr]">
+      {/* Carousel wrapper (future-ready) */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="text-sm font-semibold text-gray-900 dark:text-white">GitHub Projects pages</div>
+          <div className="flex items-center gap-2">
+            <button onClick={goPrevSlide} className="btn-ghost !px-2 !py-1 text-xs" aria-label="Previous slide">
+              <ChevronRight size={12} className="rotate-180" />
+            </button>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{carouselIndex + 1}/{totalSlides}</span>
+            <button onClick={goNextSlide} className="btn-ghost !px-2 !py-1 text-xs" aria-label="Next slide">
+              <ChevronRight size={12} />
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <div
+            className="flex h-full transition-transform duration-300 ease-in-out"
+            style={{ width: `${totalSlides * 100}%`, transform: `translateX(-${(100 / totalSlides) * carouselIndex}%)` }}
+          >
+            <section className="h-full shrink-0" style={{ width: `${100 / totalSlides}%` }}>
+              {/* Main grid */}
+              <div className="grid min-h-0 h-full gap-4 lg:grid-cols-[340px_1fr]">
         {/* Left: project list */}
         <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-md">
           <div className="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Projects <span className="text-gray-400 dark:text-gray-500">({projects.length})</span>
+              GitHub Projects <span className="text-gray-400 dark:text-gray-500">({projects.length})</span>
             </h3>
             {canCreate && (
               <button onClick={() => setShowCreate(true)} className="btn-primary px-2.5 py-1.5 text-xs">
@@ -321,6 +349,7 @@ export default function ProjectsPage() {
                   <label key={key} className="flex cursor-pointer items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/20 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 transition hover:border-blue-300 dark:hover:border-blue-500/50">
                     {label}
                     <input type="checkbox" checked={notificationsForm[key]}
+                      disabled={!canConfigure}
                       onChange={e => setNotificationsForm(p => ({ ...p, [key]: e.target.checked }))}
                       className="h-4 w-4 accent-blue-600" />
                   </label>
@@ -329,6 +358,7 @@ export default function ProjectsPage() {
                   <div>
                     <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Recipients</label>
                     <input className="form-input" placeholder="email1@x.com, email2@x.com"
+                      disabled={!canConfigure}
                       value={notificationsForm.emailRecipients}
                       onChange={e => setNotificationsForm(p => ({ ...p, emailRecipients: e.target.value }))} />
                   </div>
@@ -337,11 +367,12 @@ export default function ProjectsPage() {
                   <div>
                     <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Slack Webhook</label>
                     <input className="form-input" placeholder="https://hooks.slack.com/services/..."
+                      disabled={!canConfigure}
                       value={notificationsForm.slackWebhookUrl}
                       onChange={e => setNotificationsForm(p => ({ ...p, slackWebhookUrl: e.target.value }))} />
                   </div>
                 )}
-                <button onClick={() => void saveNotifications()} disabled={savingNotifications} className="btn-primary w-full py-2.5 mt-2">
+                <button onClick={() => void saveNotifications()} disabled={!canConfigure || savingNotifications} className="btn-primary w-full py-2.5 mt-2">
                   {savingNotifications && <Loader2 size={14} className="animate-spin" />}
                   {savingNotifications ? 'Saving...' : 'Save settings'}
                 </button>
@@ -475,15 +506,29 @@ export default function ProjectsPage() {
                     </div>
 
                     <div>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">Detected Test Suites</p>
-                      {analyzerResult.suites.length === 0 ? (
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">Detected Projects and Collections</p>
+                      {analyzerResult.projects.length === 0 ? (
                         <p className="text-xs text-gray-400 dark:text-gray-500 italic">No test suites detected</p>
                       ) : (
                         <div className="rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700/50 overflow-hidden">
-                          {analyzerResult.suites.map((suite, i) => (
-                            <div key={i} className="flex items-start gap-2 px-3 py-2.5">
-                              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                              <span className="break-all text-xs text-gray-600 dark:text-gray-400 font-mono">{suite}</span>
+                          {analyzerResult.projects.map((project, i) => (
+                            <div key={i} className="px-3 py-2.5">
+                              <div className="flex items-start gap-2">
+                                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                                <span className="break-all text-xs text-gray-600 dark:text-gray-400 font-mono">{project.path}</span>
+                              </div>
+                              {project.environments.length > 0 && (
+                                <div className="mt-1.5 ml-3.5">
+                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Environments: </span>
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                  {project.environments.map(env => (
+                                    <span key={env} className="inline-flex items-center rounded-full bg-sky-100 dark:bg-sky-900/30 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
+                                      {env}
+                                    </span>
+                                  ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -538,6 +583,19 @@ export default function ProjectsPage() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+              </div>
+            </section>
+
+            <section className="h-full shrink-0" style={{ width: `${100 / totalSlides}%` }}>
+              <div className="flex h-full min-h-0 flex-col rounded-xl border border-dashed border-gray-300 bg-white p-6 shadow-md dark:border-gray-600 dark:bg-gray-800">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Slide 2</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  Placeholder for future GitHub Project sections.
+                </p>
+              </div>
+            </section>
           </div>
         </div>
       </div>

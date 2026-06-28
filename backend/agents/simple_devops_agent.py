@@ -5,7 +5,7 @@ Simple SimpleDevOpsAgent without complex dependencies
 import os
 from typing import List, Dict
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 
 
 class SimpleDevOpsAgent:

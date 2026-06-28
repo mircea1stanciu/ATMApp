@@ -54,6 +54,8 @@ class DockerTestRunner:
         test_path: str = ".",
         timeout: int = 600,
         environment: Optional[Dict[str, str]] = None,
+        custom_command: Optional[str] = None,
+        working_dir: Optional[str] = None,
     ) -> Tuple[int, str, str]:
         """
         Run tests in a Docker container.
@@ -72,7 +74,15 @@ class DockerTestRunner:
         image = self._get_docker_image(framework)
         
         # Build run command
-        run_cmd = FrameworkDetector.get_run_command(framework, test_path)
+        run_cmd = custom_command or FrameworkDetector.get_run_command(framework, test_path)
+        install_cmd = FrameworkDetector.get_install_command(framework)
+
+        full_cmd = run_cmd
+        if framework == TestFramework.BRUNO and install_cmd:
+            full_cmd = f"{install_cmd} && {run_cmd}"
+
+        # Use a shell command to support chained install + run commands.
+        container_cmd = ["/bin/sh", "-lc", full_cmd]
         
         # Container environment
         container_env = environment or {}
@@ -85,9 +95,9 @@ class DockerTestRunner:
             # Run container
             container = self.client.containers.run(
                 image,
-                run_cmd,
-                volumes={repo_path: {"bind": "/workspace", "mode": "ro"}},
-                working_dir="/workspace",
+                container_cmd,
+                volumes={repo_path: {"bind": "/workspace", "mode": "rw"}},
+                working_dir=working_dir or "/workspace",
                 environment=container_env,
                 mem_limit=settings.DOCKER_RUNNER_MEM_LIMIT,
                 network_mode=settings.DOCKER_RUNNER_NETWORK,
@@ -130,6 +140,7 @@ class DockerTestRunner:
             TestFramework.PLAYWRIGHT: "mcr.microsoft.com/playwright:v1.40.0-focal",
             TestFramework.CYPRESS: "cypress/base:latest",
             TestFramework.ROBOT: "python:3.11-slim",
+            TestFramework.BRUNO: "node:20-bullseye",
             TestFramework.JUNIT: "maven:3.8-openjdk-11",
         }
         return images.get(framework, "python:3.11-slim")

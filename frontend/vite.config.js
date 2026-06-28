@@ -29,12 +29,18 @@ export default defineConfig({
                 manualChunks(id) {
                     if (!id.includes('node_modules'))
                         return undefined;
-                    if (id.includes('recharts'))
+                    if (id.includes('recharts') || id.includes('d3-'))
                         return 'vendor-charts';
                     if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('dompurify'))
                         return 'vendor-reports';
                     if (id.includes('lucide-react'))
                         return 'vendor-icons';
+                    if (id.includes('framer-motion'))
+                        return 'vendor-motion';
+                    if (id.includes('zustand'))
+                        return 'vendor-zustand';
+                    if (id.includes('react-router') || id.includes('@remix-run'))
+                        return 'vendor-router';
                     if (id.includes('react') || id.includes('scheduler'))
                         return 'vendor-react';
                     return undefined;

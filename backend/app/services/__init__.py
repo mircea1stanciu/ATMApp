@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timezone
 import uuid
+from uuid import UUID
 from typing import Optional
 
 from app.models.models import User, UserRole
@@ -26,7 +27,7 @@ class AuthService:
             email=user_data.email,
             hashed_password=get_password_hash(user_data.password),
             full_name=user_data.full_name,
-            role=UserRole.automation_user,
+            role=UserRole.viewer,
             is_active=True,
         )
         db.add(user)
@@ -84,6 +85,7 @@ class AuthService:
         email: Optional[str] = None,
         full_name: Optional[str] = None,
         role: Optional[str] = None,
+        assigned_lead_id: Optional[str] = None,
         is_active: Optional[bool] = None,
         password: Optional[str] = None,
     ) -> User:
@@ -99,6 +101,10 @@ class AuthService:
             user.full_name = full_name
         if role is not None:
             user.role = UserRole(role)
+            if user.role not in {UserRole.automation_user, UserRole.viewer}:
+                user.assigned_lead_id = None
+        if assigned_lead_id is not None:
+            user.assigned_lead_id = UUID(assigned_lead_id) if assigned_lead_id else None
         if is_active is not None:
             user.is_active = is_active
         if password is not None:
@@ -113,3 +119,16 @@ class AuthService:
                 raise ValueError("Email already exists")
             raise ValueError(f"Database error: {str(e)}")
         return user
+
+    @staticmethod
+    async def delete_user(db: AsyncSession, user_id: str) -> bool:
+        """Delete a user by id."""
+        stmt = select(User).where(User.id == user_id)
+        result = await db.execute(stmt)
+        user = result.scalars().first()
+        if not user:
+            return False
+
+        await db.delete(user)
+        await db.commit()
+        return True

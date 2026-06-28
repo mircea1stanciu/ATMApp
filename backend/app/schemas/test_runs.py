@@ -11,6 +11,12 @@ class TestRunCreate(BaseModel):
     triggered_by: Optional[str] = None
 
 
+class ExecuteRunRequest(BaseModel):
+    run_project: Optional[str] = None
+    run_collection: Optional[str] = None
+    run_environment: Optional[str] = None
+
+
 class TestRunResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     

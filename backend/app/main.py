@@ -6,11 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.endpoints import auth, projects, suites, runs, reports, webhooks, badges
 from app.api.v1.endpoints import settings as settings_router
+from app.api.v1.endpoints import test_manager as test_manager_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup
     yield
     # shutdown
 
@@ -58,7 +58,8 @@ app.include_router(runs.router,      prefix="/api/v1/runs",      tags=["runs"])
 app.include_router(reports.router,   prefix="/api/v1/reports",   tags=["reports"])
 app.include_router(webhooks.router,  prefix="/api/v1/webhooks",  tags=["webhooks"])
 app.include_router(badges.router,          prefix="/api/v1/badge",     tags=["badges"])
-app.include_router(settings_router.router, prefix="/api/v1/settings",  tags=["settings"])
+app.include_router(settings_router.router,     prefix="/api/v1/settings",      tags=["settings"])
+app.include_router(test_manager_router.router, prefix="/api/v1/test-manager", tags=["test-manager"])
 
 
 @app.get("/health")

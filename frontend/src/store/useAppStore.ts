@@ -10,6 +10,8 @@ import type {
   UserResponse,
 } from '@/types/domain'
 
+const LAST_ACTIVITY_KEY = 'tm_last_activity_at'
+
 // ─── Derived types ───────────────────────────────────────────────────────────
 
 type CompareStatus = 'pending' | 'running' | 'passed' | 'failed' | 'error' | 'skipped' | 'cancelled' | 'missing'
@@ -66,12 +68,19 @@ interface AppState {
   suites: TestSuite[]
   selectedSuiteId: string | null
   branches: string[]
+  collections: string[]
+  detectedProjects: string[]
+  projectCollections: Record<string, string[]>
+  collectionEnvironments: Record<string, string[]>
   runs: TestRun[]
   selectedRunId: string | null
   selectedRunDetails: TestRunDetails | null
   runDetailsLoading: boolean
   expandedResultId: string | null
   runBranch: string
+  runProject: string
+  runCollection: string
+  runEnvironment: string
 
   // Forms
   projectForm: { name: string; git_repo_url: string; description: string; default_branch: string; framework: string }
@@ -99,6 +108,9 @@ interface AppState {
   setSelectedRunId: (id: string | null) => void
   setExpandedResultId: (id: string | null) => void
   setRunBranch: (branch: string) => void
+  setRunProject: (project: string) => void
+  setRunCollection: (collection: string) => void
+  setRunEnvironment: (environment: string) => void
   setProjectForm: (fn: (prev: AppState['projectForm']) => AppState['projectForm']) => void
   setSuiteForm: (fn: (prev: AppState['suiteForm']) => AppState['suiteForm']) => void
   setNotificationsForm: (fn: (prev: NotificationsFormState) => NotificationsFormState) => void
@@ -180,7 +192,7 @@ function buildRunComparison(resultsA: TestResult[], resultsB: TestResult[]) {
 
 export const useAppStore = create<AppState>((set, get) => ({
   // Auth
-  token: localStorage.getItem('tm_access_token'),
+  token: localStorage.getItem('tm_access_token') || localStorage.getItem('token'),
   user: null,
   loading: false,
   error: null,
@@ -191,12 +203,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   suites: [],
   selectedSuiteId: null,
   branches: [],
+  collections: [],
+  detectedProjects: [],
+  projectCollections: {},
+  collectionEnvironments: {},
   runs: [],
   selectedRunId: null,
   selectedRunDetails: null,
   runDetailsLoading: false,
   expandedResultId: null,
   runBranch: 'main',
+  runProject: '',
+  runCollection: '',
+  runEnvironment: '',
 
   // Forms
   projectForm: { name: '', git_repo_url: '', description: '', default_branch: 'main', framework: 'pytest' },
@@ -222,6 +241,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedRunId: (id) => set({ selectedRunId: id, expandedResultId: null }),
   setExpandedResultId: (id) => set({ expandedResultId: id }),
   setRunBranch: (branch) => set({ runBranch: branch }),
+  setRunProject: (project) => set({ runProject: project }),
+  setRunCollection: (collection) => set({ runCollection: collection }),
+  setRunEnvironment: (environment) => set({ runEnvironment: environment }),
   setProjectForm: (fn) => set(s => ({ projectForm: fn(s.projectForm) })),
   setSuiteForm: (fn) => set(s => ({ suiteForm: fn(s.suiteForm) })),
   setNotificationsForm: (fn) => set(s => ({ notificationsForm: fn(s.notificationsForm) })),
@@ -231,17 +253,28 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   authenticate: (token) => {
     localStorage.setItem('tm_access_token', token)
+    localStorage.setItem('token', token)
+    localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()))
     setAccessToken(token)
     set({ token })
   },
 
   logout: () => {
     localStorage.removeItem('tm_access_token')
+    localStorage.removeItem('token')
+    localStorage.removeItem(LAST_ACTIVITY_KEY)
     setAccessToken(null)
     set({
       token: null, user: null, projects: [], suites: [], runs: [],
       selectedProjectId: null, selectedSuiteId: null, selectedRunId: null,
       selectedRunDetails: null,
+      collections: [],
+      detectedProjects: [],
+      projectCollections: {},
+      collectionEnvironments: {},
+      runProject: '',
+      runCollection: '',
+      runEnvironment: '',
     })
   },
 
@@ -267,12 +300,57 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { token } = get()
     if (!token) return
     try {
-      const [ss, rs, bs] = await Promise.all([
+      const [ss, rs, bs, analysis] = await Promise.all([
         apiService.listSuites(projectId),
         apiService.listRunsByProject(projectId),
         apiService.listBranches(projectId),
+        apiService.analyzeProjectRepo(projectId).catch(() => ({ frameworks: [], projects: [], files_count: 0 })),
       ])
-      set({ suites: ss, runs: rs, branches: bs.map(b => b.name) })
+      const detectedCollections = analysis.projects.map(p => p.path)
+      const projectCollections: Record<string, string[]> = {}
+      const collectionEnvironments: Record<string, string[]> = {}
+      for (const projectEntry of analysis.projects) {
+        const path = projectEntry.path.trim()
+        if (!path) continue
+        collectionEnvironments[path] = [...new Set(projectEntry.environments || [])].sort((a, b) => a.localeCompare(b))
+      }
+      for (const path of detectedCollections) {
+        const normalized = path.trim()
+        if (!normalized) continue
+        const projectName = normalized.includes('/') ? normalized.split('/')[0] : normalized
+        if (!projectCollections[projectName]) projectCollections[projectName] = []
+        projectCollections[projectName].push(normalized)
+      }
+      const detectedProjects = Object.keys(projectCollections).sort((a, b) => a.localeCompare(b))
+      for (const key of detectedProjects) {
+        projectCollections[key] = [...new Set(projectCollections[key])].sort((a, b) => a.localeCompare(b))
+      }
+
+      const currentRunProject = get().runProject
+      const runProject = detectedProjects.includes(currentRunProject) ? currentRunProject : (detectedProjects[0] || '')
+      const filteredCollections = runProject ? (projectCollections[runProject] || []) : detectedCollections
+      const currentRunCollection = get().runCollection
+      const runCollection = filteredCollections.includes(currentRunCollection)
+        ? currentRunCollection
+        : (filteredCollections[0] || '')
+      const availableEnvironments = runCollection ? (collectionEnvironments[runCollection] || []) : []
+      const currentRunEnvironment = get().runEnvironment
+      const runEnvironment = availableEnvironments.includes(currentRunEnvironment)
+        ? currentRunEnvironment
+        : (availableEnvironments[0] || '')
+
+      set({
+        suites: ss,
+        runs: rs,
+        branches: bs.map(b => b.name),
+        collections: detectedCollections,
+        detectedProjects,
+        projectCollections,
+        collectionEnvironments,
+        runProject,
+        runCollection,
+        runEnvironment,
+      })
       if (ss.length > 0) set(s => ({ selectedSuiteId: s.selectedSuiteId || ss[0].id }))
       if (rs.length === 0) {
         set({ selectedRunId: null, selectedRunDetails: null })
@@ -397,29 +475,64 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   createRun: async () => {
-    const { selectedSuiteId, user, runBranch, projects, selectedProjectId } = get()
-    if (!selectedSuiteId || !user?.email) {
-      set({ error: 'Selectează o suită și asigură-te că ești autentificat.' })
+    const {
+      selectedSuiteId,
+      suites,
+      user,
+      runBranch,
+      projects,
+      selectedProjectId,
+      runProject,
+      runCollection,
+      runEnvironment,
+    } = get()
+    if (!selectedProjectId || !user?.email) {
+      set({ error: 'Selecteaza un proiect si asigura-te ca esti autentificat.' })
       return
     }
+
+    let suiteIdToUse = selectedSuiteId
+    if (!suiteIdToUse) {
+      suiteIdToUse = suites[0]?.id || null
+    }
+
+    if (!suiteIdToUse) {
+      const autoSuite = await apiService.createSuite(selectedProjectId, { name: 'Default Suite', tags: [] })
+      suiteIdToUse = autoSuite.id
+      set(s => ({
+        suites: [autoSuite, ...s.suites],
+        selectedSuiteId: autoSuite.id,
+      }))
+    }
+
     const project = projects.find(p => p.id === selectedProjectId)
     try {
       const r = await apiService.createRun({
-        suite_id: selectedSuiteId,
+        suite_id: suiteIdToUse,
         branch: runBranch || project?.default_branch || 'main',
         triggered_by: user.email,
       })
       set(s => ({ runs: [r, ...s.runs], selectedRunId: r.id }))
+      await apiService.executeRun(r.id, {
+        run_project: runProject || undefined,
+        run_collection: runCollection || undefined,
+        run_environment: runEnvironment || undefined,
+      })
+      if (selectedProjectId) await get().refreshProjectData(selectedProjectId)
     } catch (e) {
       set({ error: apiService.errorMessage(e) })
     }
   },
 
   executeRun: async () => {
-    const { selectedRunId, selectedProjectId } = get()
+    const { selectedRunId, selectedProjectId, runProject, runCollection, runEnvironment } = get()
     if (!selectedRunId || !selectedProjectId) return
     try {
-      await apiService.executeRun(selectedRunId)
+      await apiService.executeRun(selectedRunId, {
+        run_project: runProject || undefined,
+        run_collection: runCollection || undefined,
+        run_environment: runEnvironment || undefined,
+      })
       await get().refreshProjectData(selectedProjectId)
       const d = await apiService.getRunDetails(selectedRunId)
       set({ selectedRunDetails: d })

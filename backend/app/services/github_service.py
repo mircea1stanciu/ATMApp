@@ -1,6 +1,7 @@
 import httpx
 from typing import Optional, List, Dict, Any
 import re
+from urllib.parse import urlparse
 from app.core.config import settings
 
 
@@ -8,12 +9,34 @@ class GitHubService:
     """Service for interacting with GitHub API."""
     
     def __init__(self):
-        self.base_url = "https://api.github.com"
+        self.base_url = self._resolve_api_base_url(settings.GITHUB_MCP_BASE_URL)
         self.token = settings.GITHUB_TOKEN
         self.headers = {
             "Authorization": f"token {self.token}" if self.token else "",
             "Accept": "application/vnd.github.v3+json",
         }
+
+    @staticmethod
+    def _resolve_api_base_url(configured_base_url: str) -> str:
+        """Resolve API base URL for GitHub.com or GitHub Enterprise."""
+        if not configured_base_url:
+            return "https://api.github.com"
+
+        parsed = urlparse(configured_base_url)
+        if not parsed.scheme or not parsed.netloc:
+            return "https://api.github.com"
+
+        host = parsed.netloc.lower()
+        path = (parsed.path or "").strip("/")
+
+        # Public GitHub.
+        if host == "github.com" or host.endswith(".github.com"):
+            return "https://api.github.com"
+
+        # GitHub Enterprise API root.
+        if path.startswith("api/v3"):
+            return f"{parsed.scheme}://{parsed.netloc}/{path}"
+        return f"{parsed.scheme}://{parsed.netloc}/api/v3"
     
     @staticmethod
     def parse_github_url(git_repo_url: str) -> tuple[str, str]:
@@ -25,24 +48,49 @@ class GitHubService:
         - git@github.com:owner/repo.git
         - git@github.com:owner/repo
         """
-        # Handle git@github.com format
-        if git_repo_url.startswith("git@github.com:"):
-            git_repo_url = git_repo_url.replace("git@github.com:", "https://github.com/")
+        configured_host = ""
+        if settings.GITHUB_MCP_BASE_URL:
+            parsed_cfg = urlparse(settings.GITHUB_MCP_BASE_URL)
+            configured_host = parsed_cfg.netloc.lower()
+
+        allowed_hosts = {"github.com"}
+        if configured_host:
+            allowed_hosts.add(configured_host)
+
+        # Handle SSH URLs: git@host:owner/repo(.git)
+        ssh_match = re.match(r"^git@([^:]+):([^/]+)/(.+)$", git_repo_url)
+        if ssh_match:
+            ssh_host = ssh_match.group(1).lower()
+            if ssh_host not in allowed_hosts:
+                raise ValueError(f"Invalid GitHub URL: {git_repo_url}")
+            owner = ssh_match.group(2)
+            repo = ssh_match.group(3)
+            if repo.endswith(".git"):
+                repo = repo[:-4]
+            return owner, repo
         
         # Remove .git suffix if present
         if git_repo_url.endswith(".git"):
             git_repo_url = git_repo_url[:-4]
         
-        # Must be a GitHub URL
-        if not re.search(r"https?://(www\.)?github\.com", git_repo_url):
+        parsed = urlparse(git_repo_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError(f"Invalid GitHub URL: {git_repo_url}")
-        
-        # Extract owner and repo from URL
-        match = re.search(r"github\.com/([^/]+)/(.+)$", git_repo_url)
-        if not match:
+
+        host = parsed.netloc.lower()
+        if host == "www.github.com":
+            host = "github.com"
+        if host not in allowed_hosts:
             raise ValueError(f"Invalid GitHub URL: {git_repo_url}")
-        
-        return match.group(1), match.group(2)
+
+        path_parts = [p for p in parsed.path.strip("/").split("/") if p]
+        if len(path_parts) < 2:
+            raise ValueError(f"Invalid GitHub URL: {git_repo_url}")
+
+        owner, repo = path_parts[0], path_parts[1]
+        if repo.endswith(".git"):
+            repo = repo[:-4]
+        return owner, repo
     
     async def get_branches(self, owner: str, repo: str) -> List[Dict[str, Any]]:
         """

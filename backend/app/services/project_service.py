@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
 from typing import Optional, List
+from urllib.parse import urlparse
 
 from app.models.models import Project, GitProvider
 from app.schemas.projects import ProjectCreate, ProjectUpdate
@@ -15,7 +16,21 @@ class ProjectService:
         # Validate GitHub repository if it's a GitHub project
         if project_data.git_provider == "github":
             github_service = GitHubService()
-            if not await github_service.check_repository_exists(project_data.git_repo_url):
+            repo_url = project_data.git_repo_url.strip()
+
+            # Keep strict validation for github.com URLs.
+            # For custom enterprise domains, allow project creation even when API probing fails,
+            # because host/API shape can differ from standard GitHub endpoints.
+            strict_github_host = False
+            if repo_url.startswith("git@github.com:"):
+                strict_github_host = True
+            else:
+                parsed = urlparse(repo_url)
+                host = parsed.netloc.lower() if parsed.netloc else ""
+                strict_github_host = host in {"github.com", "www.github.com"}
+
+            exists = await github_service.check_repository_exists(project_data.git_repo_url)
+            if strict_github_host and not exists:
                 raise ValueError("GitHub repository not found or not accessible")
         
         project = Project(

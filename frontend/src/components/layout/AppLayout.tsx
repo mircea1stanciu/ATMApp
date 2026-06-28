@@ -1,17 +1,19 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
-  Activity, BarChart2, FolderGit2, Github, LayoutDashboard,
+  Activity, BarChart2, Building2, FolderGit2, Github, LayoutDashboard,
   LogOut, Menu, Moon, Settings, Sun, Users, X, Zap,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { ROLE_LABELS, canAccess } from '@/types/domain'
 import type { UserRole } from '@/types/domain'
+import type { JiraProject } from '@/types/domain'
 import { apiService } from '@/services/api'
 
 const NAV = [
   { to: '/',          label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/projects',  label: 'Projects',  icon: FolderGit2 },
+  { to: '/jira-projects', label: 'Jira Projects', icon: Building2 },
+  { to: '/projects',  label: 'GitHub Projects',  icon: FolderGit2 },
   { to: '/runs',      label: 'Test Runs', icon: Activity },
   { to: '/analytics', label: 'Analytics', icon: BarChart2 },
   { to: '/users',     label: 'Users',     icon: Users },
@@ -22,11 +24,12 @@ export default function AppLayout() {
   const user = useAppStore(s => s.user)
   const projects = useAppStore(s => s.projects)
   const selectedProjectId = useAppStore(s => s.selectedProjectId)
-  const setSelectedProjectId = useAppStore(s => s.setSelectedProjectId)
   const runs = useAppStore(s => s.runs)
   const logout = useAppStore(s => s.logout)
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [jiraProjects, setJiraProjects] = useState<JiraProject[]>([])
+  const [activeJiraProjectKey, setActiveJiraProjectKey] = useState('')
   const [isDark, setIsDark] = useState(() =>
     document.documentElement.classList.contains('dark') ||
     localStorage.getItem('theme') === 'dark' ||
@@ -38,37 +41,63 @@ export default function AppLayout() {
     localStorage.setItem('theme', isDark ? 'dark' : 'light')
   }, [isDark])
 
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const settings = await apiService.getJiraSettings()
+        if (!mounted) return
+        const currentKey = settings.jira_project_key || ''
+        setActiveJiraProjectKey(currentKey)
+
+        if (settings.jira_token_set && settings.jira_mcp_base_url) {
+          try {
+            const items = await apiService.listJiraProjects()
+            if (!mounted) return
+            setJiraProjects(items)
+          } catch {
+            if (!mounted) return
+            setJiraProjects([])
+          }
+        } else {
+          setJiraProjects([])
+        }
+      } catch {
+        if (!mounted) return
+        setJiraProjects([])
+      }
+    })()
+
+    return () => {
+      mounted = false
+    }
+  }, [user?.role])
+
   const hasRunning = runs.some(r => r.status === 'running')
   const handleLogout = () => { logout(); navigate('/login') }
+  const activeJiraProjectLabel =
+    jiraProjects.find(p => p.key === activeJiraProjectKey)
+      ? `${activeJiraProjectKey} - ${jiraProjects.find(p => p.key === activeJiraProjectKey)?.name}`
+      : (activeJiraProjectKey || 'No Jira project selected')
+  const activeGitHubProjectLabel =
+    projects.find(p => p.id === selectedProjectId)?.name || 'No GitHub project selected'
 
   // GitHub connection status: null = unknown, 'none' = no token, 'ok' = connected, 'error' = failed
   const [ghStatus, setGhStatus] = useState<'none' | 'ok' | 'error'>('none')
 
   useEffect(() => {
     if (!user?.role) return
-    const isAdmin = user.role === 'admin'
-    const isLead = user.role === 'automation_lead'
 
-    if (isAdmin) {
-      // Admin checks the global token
-      apiService.getSettings()
-        .then(data => {
-          if (!data.github_token_set) { setGhStatus('none'); return }
-          return apiService.testGithubConnection().then(r => setGhStatus(r.ok ? 'ok' : 'error'))
-        })
-        .catch(() => setGhStatus('error'))
-    } else if (isLead && selectedProjectId) {
-      // Lead checks the per-project token
-      apiService.getProjectGithub(selectedProjectId)
-        .then(data => {
-          if (!data.github_token_set) { setGhStatus('none'); return }
-          return apiService.testProjectGithub(selectedProjectId).then(r => setGhStatus(r.ok ? 'ok' : 'error'))
-        })
-        .catch(() => setGhStatus('none'))
-    } else {
-      setGhStatus('none')
-    }
-  }, [user?.role, selectedProjectId])
+    apiService.getSettings()
+      .then(data => {
+        if (!data.github_token_set) {
+          setGhStatus('none')
+          return
+        }
+        return apiService.testGithubConnection().then(r => setGhStatus(r.ok ? 'ok' : 'error'))
+      })
+      .catch(() => setGhStatus('error'))
+  }, [user?.role])
 
   const sidebarContent = (
     <>
@@ -83,19 +112,21 @@ export default function AppLayout() {
         </div>
       </div>
 
-      {/* Project selector */}
+      {/* Project selectors */}
       <div className="px-4 py-4">
         <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-          Active Project
+          Active Jira Project
         </label>
-        <select
-          value={selectedProjectId || ''}
-          onChange={e => setSelectedProjectId(e.target.value || null)}
-          className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-        >
-          {projects.length === 0 && <option value="">No projects</option>}
-          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+        <div className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/70 px-3 py-2 text-xs text-gray-700 dark:text-gray-300">
+          {activeJiraProjectLabel}
+        </div>
+
+        <label className="mb-1.5 mt-3 block text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+          Active GitHub Project
+        </label>
+        <div className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/70 px-3 py-2 text-xs text-gray-700 dark:text-gray-300">
+          {activeGitHubProjectLabel}
+        </div>
       </div>
 
       <div className="mx-4 border-t border-gray-200 dark:border-gray-700" />

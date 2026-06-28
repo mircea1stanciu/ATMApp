@@ -26,6 +26,9 @@ def execute_test_run_task(
     suite_id: str,
     project_id: str,
     branch: str = "main",
+    run_project: Optional[str] = None,
+    run_collection: Optional[str] = None,
+    run_environment: Optional[str] = None,
 ) -> dict:
     """
     Celery task to execute a test run asynchronously.
@@ -55,6 +58,9 @@ def execute_test_run_task(
                     suite_uuid,
                     project_uuid,
                     branch,
+                    run_project=run_project,
+                    run_collection=run_collection,
+                    run_environment=run_environment,
                 )
         
         # Execute async function

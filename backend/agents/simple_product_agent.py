@@ -6,7 +6,7 @@ import os
 import json
 from typing import List, Dict
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 
 # Import the product management tools
 try:

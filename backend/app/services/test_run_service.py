@@ -11,10 +11,45 @@ from app.services.framework_detector import TestFramework, FrameworkDetector
 from app.services.docker_runner import DockerTestRunner, TestRunEnvironment
 from app.services.junit_parser import TestResultBuilder
 from app.services.notification_service import NotificationService
+from app.services.websocket_manager import connection_manager
 from app.core.config import settings
 
 
 class TestRunService:
+    @staticmethod
+    def _build_bruno_command(
+        run_project: Optional[str],
+        run_collection: Optional[str],
+        run_environment: Optional[str],
+    ) -> tuple[Optional[str], Optional[str]]:
+        """Build Bruno run command and working directory from selected UI context."""
+        if not run_collection or not run_environment:
+            return None, None
+
+        selected_project = (run_project or "").strip()
+        selected_collection = run_collection.strip().strip("/")
+        selected_environment = run_environment.strip()
+        if not selected_collection or not selected_environment:
+            return None, None
+
+        if not selected_project:
+            selected_project = selected_collection.split("/", 1)[0]
+
+        collection_label = selected_collection
+        project_prefix = f"{selected_project}/"
+        if selected_project and selected_collection.startswith(project_prefix):
+            collection_label = selected_collection[len(project_prefix):]
+
+        current_date = datetime.now(timezone.utc).strftime("%d-%m-%Y-%H%M%S")
+        command = (
+            f"mkdir -p results-{selected_project} && "
+            f"bru run -r --sandbox developer "
+            f"--env-file environments/{selected_environment}.bru "
+            f"--reporter-html results-{selected_project}/{collection_label}-{selected_environment}-{current_date}.html"
+        )
+        working_dir = f"/workspace/{selected_collection}"
+        return command, working_dir
+
     @staticmethod
     async def create_run(db: AsyncSession, run_data: TestRunCreate) -> TestRun:
         """Create a new test run."""
@@ -85,6 +120,9 @@ class TestRunService:
         suite_id: uuid.UUID,
         project_id: uuid.UUID,
         branch: str = "main",
+        run_project: Optional[str] = None,
+        run_collection: Optional[str] = None,
+        run_environment: Optional[str] = None,
     ) -> None:
         """
         Execute a test run end-to-end.
@@ -118,27 +156,62 @@ class TestRunService:
             test_run.started_at = datetime.now(timezone.utc)
             db.add(test_run)
             await db.flush()
+
+            rid = str(run_id)
             
             # Setup environment
-            env = TestRunEnvironment(str(run_id))
+            env = TestRunEnvironment(rid)
             runner = DockerTestRunner()
             
             # Clone repository
+            await connection_manager.broadcast_log(rid, "stdout", f"$ Cloning {project.git_repo_url} (branch: {branch})...")
             repo_path = await runner.clone_repository(project.git_repo_url, branch)
+            await connection_manager.broadcast_log(rid, "stdout", "$ Repository cloned.")
             
             try:
                 # Detect test framework
+                await connection_manager.broadcast_log(rid, "stdout", "$ Detecting test framework...")
                 framework = await TestRunService._detect_framework(repo_path)
+                await connection_manager.broadcast_log(rid, "stdout", f"$ Framework detected: {framework.value}")
+
+                custom_command = None
+                custom_working_dir = None
+                if framework == TestFramework.BRUNO:
+                    custom_command, custom_working_dir = TestRunService._build_bruno_command(
+                        run_project,
+                        run_collection,
+                        run_environment,
+                    )
+                    if custom_command:
+                        await connection_manager.broadcast_log(rid, "stdout", f"$ Working dir: {custom_working_dir}")
+                        await connection_manager.broadcast_log(rid, "stdout", f"$ Command: {custom_command}")
                 
                 # Run tests
+                await connection_manager.broadcast_log(rid, "stdout", "")
+                await connection_manager.broadcast_log(rid, "stdout", "$ Running tests...")
+                await connection_manager.broadcast_log(rid, "stdout", "─" * 60)
                 exit_code, stdout, stderr = await runner.run_tests(
                     framework,
                     repo_path,
                     test_path=((suite.config_json or {}).get("test_path") or "."),
                     timeout=int((suite.config_json or {}).get("timeout_seconds") or 600),
+                    custom_command=custom_command,
+                    working_dir=custom_working_dir,
                 )
+
+                # Stream stdout/stderr to WebSocket
+                if stdout:
+                    for line in stdout.splitlines():
+                        await connection_manager.broadcast_log(rid, "stdout", line)
+                if stderr:
+                    for line in stderr.splitlines():
+                        await connection_manager.broadcast_log(rid, "stderr", line)
+
+                await connection_manager.broadcast_log(rid, "stdout", "─" * 60)
+                await connection_manager.broadcast_log(rid, "stdout", f"$ Exit code: {exit_code}")
                 
                 # Parse results
+                await connection_manager.broadcast_log(rid, "stdout", "$ Parsing results...")
                 test_results = await TestRunService._parse_results(
                     framework,
                     exit_code,
@@ -158,8 +231,10 @@ class TestRunService:
                 # Update run status
                 if exit_code == 0:
                     test_run.status = RunStatus.passed
+                    await connection_manager.broadcast_log(rid, "stdout", "$ ✓ Tests PASSED")
                 else:
                     test_run.status = RunStatus.failed
+                    await connection_manager.broadcast_log(rid, "stderr", "$ ✗ Tests FAILED")
                     
             finally:
                 runner.cleanup(repo_path)
@@ -183,6 +258,7 @@ class TestRunService:
                 test_run.status = RunStatus.error
                 test_run.error_message = str(e)
                 test_run.finished_at = datetime.now(timezone.utc)
+                await connection_manager.broadcast_log(str(run_id), "stderr", f"$ Error: {e}")
                 if suite and project:
                     await NotificationService.send_failure_notifications(test_run, suite, project)
                 db.add(test_run)
